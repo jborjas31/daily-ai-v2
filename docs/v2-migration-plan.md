@@ -185,3 +185,23 @@ Use `docs/MIGRATION_STATUS.md` to track progress as each step lands.
 - Completed: PWA basics (manifest/icons, theme color, metadata linked).
 - Completed: CI pipeline (GitHub Actions for lint/type/test/build).
 - Next: Refine Settings UI and polish.
+
+## Remaining Actions To Complete This Plan
+
+1) Enforce CI as a required check for merges
+   - Configure GitHub branch protection on `main` to require the workflow "CI / build-and-test" before merging and require branches to be up to date.
+
+2) Implement editable Settings UI with persistence
+   - Add a form on `/settings` to edit `desiredSleepDuration`, `defaultWakeTime`, and `defaultSleepTime` with validation and save to Firestore; wire to the store.
+
+3) Persist Task Instances to Firestore
+   - Create `src/lib/data/instances.ts` (CRUD for `users/{uid}/task_instances`). Load instances for the selected date and update `toggleComplete` to write-through to Firestore (offline-friendly via persistence).
+
+4) Minimal route guards / redirects (client-side)
+   - Redirect unauthenticated users from `/today` and `/library` to `/login`; after sign-in, redirect to `/today`.
+
+5) Optional: Cache daily schedules
+   - Store computed schedules under `users/{uid}/daily_schedules/{date}` to speed up subsequent loads. Refresh cache when templates/instances change.
+
+6) Add store unit tests (slices/selectors)
+   - Tests for `setUser`, `setSettings`, `toggleComplete`, `generateScheduleForDate` to meet the DoD in this plan.
