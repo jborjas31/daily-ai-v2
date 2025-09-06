@@ -39,7 +39,7 @@ Update this file as tasks complete. Check items when merged into main.
 ## Hosting
 - [x] Firebase Hosting configured (`firebase.json`, `.firebaserc`)
 - [x] Next static export configured (`output: 'export'`)
-- [ ] Deploy script verified
+- [x] Deploy script verified
 
 ## CI
 - [x] GitHub Actions workflow runs lint/typecheck/test/build on PR
