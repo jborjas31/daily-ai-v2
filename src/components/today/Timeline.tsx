@@ -27,10 +27,10 @@ function useNowMinutes() {
 }
 
 export default function Timeline() {
-  const currentDate = useAppStore((s: any) => s.ui.currentDate);
-  const settings = useAppStore((s: any) => s.settings);
-  const templates = useAppStore((s: any) => s.templates);
-  const scheduleRes = useAppStore((s: any) => s.generateScheduleForDate(currentDate));
+  const currentDate = useAppStore((s) => s.ui.currentDate);
+  const settings = useAppStore((s) => s.settings);
+  const templates = useAppStore((s) => s.templates);
+  const scheduleRes = useAppStore((s) => s.generateScheduleForDate(currentDate));
   const containerRef = useRef<HTMLDivElement>(null);
   const nowMins = useNowMinutes();
 
@@ -43,7 +43,7 @@ export default function Timeline() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const blocks = scheduleRes.schedule.map((b: any) => {
+  const blocks = scheduleRes.schedule.map((b) => {
     const start = toMinutes(b.startTime);
     const end = toMinutes(b.endTime);
     const dur = Math.max(0, end - start);

@@ -7,6 +7,7 @@ type AuthContextValue = {
   user: AuthUser;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -22,7 +23,6 @@ export default function FirebaseClientProvider({ children }: { children: React.R
       try {
         await ensureFirestorePersistence();
       } catch (e) {
-        // eslint-disable-next-line no-console
         console.warn("Failed to enable Firestore persistence", e);
       }
       unsub = authApi.onAuthStateChanged((u) => {
@@ -44,6 +44,9 @@ export default function FirebaseClientProvider({ children }: { children: React.R
     loading,
     async signIn(email: string, password: string) {
       await authApi.signInWithEmailAndPassword(email, password);
+    },
+    async signUp(email: string, password: string) {
+      await authApi.createUserWithEmailAndPassword(email, password);
     },
     async signOut() {
       await authApi.signOut();

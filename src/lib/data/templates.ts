@@ -15,34 +15,40 @@ export async function listTemplates(uid: string): Promise<TaskTemplate[]> {
   const snap = await getDocs(col(uid));
   const out: TaskTemplate[] = [];
   snap.forEach((d) => {
-    const data = d.data() as any;
-    out.push({ id: d.id, ...data } as TaskTemplate);
+    const data = d.data() as Omit<TaskTemplate, 'id'>;
+    out.push({ id: d.id, ...data });
   });
   return out;
 }
 
 export async function createTemplate(uid: string, tpl: Omit<TaskTemplate, 'id'>): Promise<TaskTemplate> {
-  const { id, ...rest } = tpl as any;
-  const res = await addDoc(col(uid), rest);
-  return { ...(tpl as any), id: res.id } as TaskTemplate;
+  const res = await addDoc(col(uid), tpl);
+  return { ...tpl, id: res.id };
 }
 
 export async function updateTemplate(uid: string, id: string, updates: Partial<TaskTemplate>): Promise<void> {
-  await updateDoc(ref(uid, id), updates as any);
+  await updateDoc(ref(uid, id), updates);
 }
 
 export async function softDeleteTemplate(uid: string, id: string): Promise<void> {
-  await updateDoc(ref(uid, id), { isActive: false } as any);
+  await updateDoc(ref(uid, id), { isActive: false });
 }
 
 export async function duplicateTemplate(uid: string, tpl: TaskTemplate): Promise<TaskTemplate> {
   const copy: Omit<TaskTemplate, 'id'> = {
-    ...tpl,
+    taskName: tpl.taskName,
+    description: tpl.description,
+    isMandatory: tpl.isMandatory,
+    priority: tpl.priority,
     isActive: true,
-    taskName: `Copy of ${tpl.taskName}`,
-  } as any;
-  const { id, ...rest } = copy as any;
-  const res = await addDoc(col(uid), rest);
-  return { ...(copy as any), id: res.id } as TaskTemplate;
+    schedulingType: tpl.schedulingType,
+    defaultTime: tpl.defaultTime,
+    timeWindow: tpl.timeWindow,
+    durationMinutes: tpl.durationMinutes,
+    minDurationMinutes: tpl.minDurationMinutes,
+    dependsOn: tpl.dependsOn,
+    recurrenceRule: tpl.recurrenceRule,
+  };
+  const res = await addDoc(col(uid), copy);
+  return { ...copy, id: res.id };
 }
-

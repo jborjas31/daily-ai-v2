@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/providers/FirebaseClientProvider";
 import { useAppStore } from "@/store/useAppStore";
 import type { AppState } from "@/store/useAppStore";
+import type { TaskTemplate } from "@/lib/types";
 import { listTemplates, updateTemplate, duplicateTemplate, softDeleteTemplate, createTemplate } from "@/lib/data/templates";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import TaskModal from "@/components/library/TaskModal";
@@ -16,7 +17,7 @@ export default function LibraryPage() {
   const [loading, setLoading] = useState(false);
   const [confirm, setConfirm] = useState<{ id: string; name: string } | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editItem, setEditItem] = useState<any>(null);
+  const [editItem, setEditItem] = useState<TaskTemplate | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -25,7 +26,7 @@ export default function LibraryPage() {
       try {
         const list = await listTemplates(user.uid);
         setTaskTemplates(list);
-      } catch (e) {
+      } catch {
         toast.error("Failed to load templates");
       } finally {
         setLoading(false);
@@ -36,26 +37,26 @@ export default function LibraryPage() {
   const active = useMemo(() => templates.filter(t => t.isActive !== false), [templates]);
   const inactive = useMemo(() => templates.filter(t => t.isActive === false), [templates]);
 
-  async function toggleActive(t: any) {
+  async function toggleActive(t: TaskTemplate) {
     if (!user) return;
     const newVal = !(t.isActive !== false);
     upsert({ ...t, isActive: newVal });
     try {
       await updateTemplate(user.uid, t.id, { isActive: newVal });
       toast.success(newVal ? "Enabled" : "Disabled");
-    } catch (e) {
+    } catch {
       upsert({ ...t });
       toast.error("Failed to update");
     }
   }
 
-  async function onDuplicate(t: any) {
+  async function onDuplicate(t: TaskTemplate) {
     if (!user) return;
     try {
       const created = await duplicateTemplate(user.uid, t);
       upsert(created);
       toast.success("Duplicated");
-    } catch (e) {
+    } catch {
       toast.error("Failed to duplicate");
     }
   }
@@ -68,21 +69,21 @@ export default function LibraryPage() {
     try {
       await softDeleteTemplate(user.uid, id);
       toast.success("Deleted (soft)");
-    } catch (e) {
+    } catch {
       upsert({ ...t });
       toast.error("Failed to delete");
     }
   }
 
-  async function onSaveModal(payload: any) {
+  async function onSaveModal(payload: Omit<TaskTemplate, 'id'> | TaskTemplate) {
     if (!user) return;
-    if (payload.id) {
+    if ('id' in payload) {
       // edit
       upsert(payload);
       try {
         await updateTemplate(user.uid, payload.id, payload);
         toast.success("Saved");
-      } catch (e) {
+      } catch {
         toast.error("Failed to save");
       }
     } else {
@@ -91,7 +92,7 @@ export default function LibraryPage() {
         const created = await createTemplate(user.uid, payload);
         upsert(created);
         toast.success("Created");
-      } catch (e) {
+      } catch {
         toast.error("Failed to create");
       }
     }

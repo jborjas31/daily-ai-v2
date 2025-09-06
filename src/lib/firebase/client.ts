@@ -7,6 +7,7 @@ import {
   type Auth,
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut,
   type User,
 } from "firebase/auth";
@@ -32,7 +33,6 @@ export function getFirebaseApp(): FirebaseApp {
   } as const;
 
   if (!config.apiKey || !config.authDomain || !config.projectId || !config.appId) {
-    // eslint-disable-next-line no-console
     console.warn("Firebase config is missing one or more NEXT_PUBLIC_* env vars");
   }
 
@@ -58,11 +58,10 @@ export async function ensureFirestorePersistence(): Promise<void> {
   try {
     // Try multi-tab first; fall back to single-tab if not available
     await enableMultiTabIndexedDbPersistence(db);
-  } catch (err) {
+  } catch {
     try {
       await enableIndexedDbPersistence(db);
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.warn("Firestore persistence not available:", e);
     }
   } finally {
@@ -76,6 +75,7 @@ export const authApi = {
   onAuthStateChanged: (cb: (user: AuthUser) => void) => onAuthStateChanged(getFirebaseAuth(), cb),
   signInWithEmailAndPassword: (email: string, password: string) =>
     signInWithEmailAndPassword(getFirebaseAuth(), email, password),
+  createUserWithEmailAndPassword: (email: string, password: string) =>
+    createUserWithEmailAndPassword(getFirebaseAuth(), email, password),
   signOut: () => signOut(getFirebaseAuth()),
 };
-

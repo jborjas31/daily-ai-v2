@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateSchedule, type SchedulingInput } from './SchedulingEngine';
+import { generateSchedule } from './SchedulingEngine';
 import type { TaskTemplate, Settings, TaskInstance } from '@/lib/types';
 
 function baseSettings(overrides?: Partial<Settings>): Settings {
@@ -92,4 +92,3 @@ describe('SchedulingEngine (pure)', () => {
     expect(toMin(groceries2!.startTime)).toBeGreaterThanOrEqual(15*60 + 30);
   });
 });
-

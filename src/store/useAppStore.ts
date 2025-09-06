@@ -3,7 +3,7 @@ import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import type { AuthUser } from "@/lib/firebase/client";
-import type { Settings, TaskTemplate, TaskInstance, ScheduleResult, InstanceStatus } from "@/lib/types";
+import type { Settings, TaskTemplate, TaskInstance, ScheduleResult } from "@/lib/types";
 import { generateSchedule } from "@/lib/domain/scheduling/SchedulingEngine";
 
 type FiltersState = {
@@ -60,7 +60,7 @@ const defaultSettings: Settings = {
 
 export const useAppStore = create<AppState>()(
   devtools(
-    immer((set: any, get: any) => ({
+    immer((set, get) => ({
       user: null,
       settings: defaultSettings,
       templates: [],

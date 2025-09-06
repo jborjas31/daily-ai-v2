@@ -41,7 +41,7 @@ export default function AppHeader() {
               </button>
             </>
           ) : (
-            <span>Not signed in</span>
+            <a href="/login" className="px-2 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700">Sign in</a>
           )}
         </div>
       </div>

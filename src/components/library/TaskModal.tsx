@@ -1,6 +1,6 @@
 "use client";
 import * as Dialog from "@radix-ui/react-dialog";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { TaskTemplate } from "@/lib/types";
 
 type FormState = {
@@ -69,16 +69,25 @@ export default function TaskModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const payload: any = {
-      ...form,
-      defaultTime: isFixed ? (form.defaultTime || '08:00') : undefined,
-      timeWindow: isFixed ? undefined : (form.timeWindow || 'anytime'),
+    const base: Omit<TaskTemplate, 'id'> = {
+      taskName: form.taskName,
+      isMandatory: form.isMandatory,
+      priority: form.priority,
+      isActive: form.isActive,
+      schedulingType: form.schedulingType,
+      ...(isFixed
+        ? { defaultTime: form.defaultTime || '08:00' }
+        : { timeWindow: form.timeWindow || 'anytime' }),
+      durationMinutes: form.durationMinutes,
+      ...(form.minDurationMinutes !== undefined
+        ? { minDurationMinutes: form.minDurationMinutes }
+        : {}),
     };
-    if (isEdit && initial) {
-      await onSave({ ...payload, id: initial.id } as TaskTemplate);
-    } else {
-      await onSave(payload as Omit<TaskTemplate, 'id'>);
-    }
+
+    const toSave: Omit<TaskTemplate, 'id'> | TaskTemplate =
+      isEdit && initial ? { ...base, id: initial.id } : base;
+
+    await onSave(toSave);
     onOpenChange(false);
   }
 
@@ -120,7 +129,11 @@ export default function TaskModal({
             ) : (
               <div>
                 <label className="block text-sm mb-1">Time Window</label>
-                <select value={form.timeWindow} onChange={(e)=>update('timeWindow', e.target.value as any)} className="w-full border rounded-md px-2 py-1.5">
+                <select
+                  value={form.timeWindow}
+                  onChange={(e)=>update('timeWindow', e.target.value as FormState['timeWindow'])}
+                  className="w-full border rounded-md px-2 py-1.5"
+                >
                   <option value="morning">Morning</option>
                   <option value="afternoon">Afternoon</option>
                   <option value="evening">Evening</option>
@@ -157,4 +170,3 @@ export default function TaskModal({
     </Dialog.Root>
   );
 }
-
