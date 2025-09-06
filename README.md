@@ -1,36 +1,83 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Daily AI V2
 
-## Getting Started
+Daily AI is a personal, time‑based daily task manager with an intelligent scheduling engine. V2 modernizes the original vanilla app using Next.js (App Router), React, Tailwind, Zustand, and Firebase.
 
-First, run the development server:
+## Quickstart
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+1) Install dependencies
+
+```
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2) Set environment variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Copy `.env.example` to `.env.local` and ensure the Firebase client keys are set:
+  - `NEXT_PUBLIC_FIREBASE_API_KEY`
+  - `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+  - `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+  - `NEXT_PUBLIC_FIREBASE_APP_ID`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+3) Run the app
 
-## Learn More
+```
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Open http://localhost:3000 and navigate to `/today`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Features (MVP)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Today view: timeline (24h grid, sleep shading, now‑line) plus a basic list
+- Library: manage task templates (enable/disable, duplicate, soft delete, edit/create)
+- Settings: read‑only placeholder (editable UI coming next)
+- Auth: client‑side Firebase Auth (email/password); sign out in header
+- Offline: Firestore offline persistence enabled
+- PWA basics: manifest + icons (no custom service worker yet)
 
-## Deploy on Vercel
+## Tech Stack
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Next.js 15 (App Router), React 19, Tailwind 4
+- Zustand store with `immer` and `devtools`
+- Firebase modular SDK: Auth + Firestore
+- Domain logic: pure modules in `src/lib/domain/scheduling` (Recurrence, SchedulingEngine)
+- Tests: Vitest
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Scripts
+
+- `npm run dev` — start dev server
+- `npm run build` — production build
+- `npm run start` — start production server
+- `npm run lint` — run ESLint
+- `npm run typecheck` — TypeScript type check
+- `npm run test` — run unit tests (Vitest)
+
+## Project Structure (key paths)
+
+- `src/app/` — routes and layout (`today`, `library`, `settings`)
+- `src/components/` — UI components (header/nav, timeline, dialogs, modals)
+- `src/store/useAppStore.ts` — Zustand store (state, actions, selectors)
+- `src/lib/domain/scheduling/` — Recurrence + SchedulingEngine (pure)
+- `src/lib/firebase/client.ts` — Firebase client init + persistence
+- `src/lib/data/templates.ts` — Firestore template CRUD helpers
+- `public/manifest.webmanifest` — PWA manifest + `public/icons/*`
+
+## Data Model
+
+- Firestore collections (per user):
+  - `/users/{userId}` — Settings
+  - `/users/{userId}/tasks` — Task templates (active/soft‑deleted)
+  - `/users/{userId}/task_instances` — Daily task modifications
+  - `/users/{userId}/daily_schedules` — Per‑day sleep overrides
+
+## Docs & Migration
+
+- Plan: `docs/v2-migration-plan.md`
+- Action steps: `docs/v2-action-plan.md`
+- Status: `docs/MIGRATION_STATUS.md`
+- V1 reference (vanilla app): `old_project/`
+
+## Notes
+
+- Time handling is local device time only (no time zones). Times are stored as `HH:MM` strings.
+- Service worker is deferred to post‑MVP; manifest/icons are present for installability.
