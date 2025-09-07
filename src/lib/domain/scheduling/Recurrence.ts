@@ -26,7 +26,17 @@ export interface RecurrenceRule {
 }
 
 function toDate(d: string | Date): Date {
-  return d instanceof Date ? new Date(d) : new Date(d);
+  if (d instanceof Date) {
+    // Normalize to local midnight to avoid TZ drift in day/month comparisons
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+  // Parse canonical YYYY-MM-DD as a date-only value at local midnight
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    const [y, m, da] = d.split('-').map((x) => parseInt(x, 10));
+    return new Date(y, m - 1, da);
+  }
+  // Fallback for other formats
+  return new Date(d);
 }
 
 export function formatDate(date: Date): string {
@@ -210,4 +220,3 @@ export function validateRecurrenceRule(rule: unknown): { isValid: boolean; error
   }
   return result;
 }
-

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { useAuth } from "@/components/providers/FirebaseClientProvider";
+import useRequireAuth from "@/components/guards/useRequireAuth";
 import { useAppStore } from "@/store/useAppStore";
 import type { AppState } from "@/store/useAppStore";
 import type { TaskTemplate } from "@/lib/types";
@@ -10,7 +10,7 @@ import TaskModal from "@/components/library/TaskModal";
 import { toast } from "sonner";
 
 export default function LibraryPage() {
-  const { user } = useAuth();
+  const { user, ready } = useRequireAuth();
   const templates = useAppStore((s: AppState) => s.templates);
   const setTaskTemplates = useAppStore((s: AppState) => s.setTaskTemplates);
   const upsert = useAppStore((s: AppState) => s.upsertTaskTemplate);
@@ -21,7 +21,7 @@ export default function LibraryPage() {
 
   useEffect(() => {
     (async () => {
-      if (!user) return;
+      if (!ready || !user) return;
       setLoading(true);
       try {
         const list = await listTemplates(user.uid);
@@ -32,7 +32,18 @@ export default function LibraryPage() {
         setLoading(false);
       }
     })();
-  }, [user, setTaskTemplates]);
+  }, [ready, user, setTaskTemplates]);
+
+  if (!ready) {
+    return (
+      <div className="mx-auto max-w-6xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h1 className="text-xl font-semibold">Library</h1>
+        </div>
+        <p className="text-sm text-black/70 dark:text-white/70">Loading…</p>
+      </div>
+    );
+  }
 
   const active = useMemo(() => templates.filter(t => t.isActive !== false), [templates]);
   const inactive = useMemo(() => templates.filter(t => t.isActive === false), [templates]);

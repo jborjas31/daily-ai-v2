@@ -5,6 +5,8 @@ import { immer } from "zustand/middleware/immer";
 import type { AuthUser } from "@/lib/firebase/client";
 import type { Settings, TaskTemplate, TaskInstance, ScheduleResult } from "@/lib/types";
 import { generateSchedule } from "@/lib/domain/scheduling/SchedulingEngine";
+import { listInstancesByDate, upsertInstance, deleteInstance, instanceIdFor } from "@/lib/data/instances";
+import { getCachedSchedule, putCachedSchedule } from "@/lib/data/schedules";
 
 type FiltersState = {
   search: string;
@@ -26,25 +28,28 @@ type AppState = {
   // UI/Filters
   ui: UiState;
   filters: FiltersState;
+  scheduleCacheByDate: Record<string, ScheduleResult | undefined>;
 
   // Actions
   setUser: (user: AuthUser) => void;
   setSettings: (settings: Settings) => void;
   setCurrentDate: (date: string) => void;
   setViewMode: (mode: UiState['viewMode']) => void;
+  preloadCachedSchedule: (date: string) => Promise<void>;
 
   setTaskTemplates: (templates: TaskTemplate[]) => void;
   upsertTaskTemplate: (template: TaskTemplate) => void;
   removeTaskTemplate: (id: string) => void;
 
   setTaskInstancesForDate: (date: string, instances: TaskInstance[]) => void;
-  toggleComplete: (date: string, templateId: string) => void;
+  loadInstancesForDate: (date: string) => Promise<void>;
+  toggleComplete: (date: string, templateId: string) => Promise<boolean>;
   resetAfterSignOut: () => void;
 
   // Selectors
   getTaskInstancesForDate: (date: string) => TaskInstance[];
   getTemplateById: (id: string) => TaskTemplate | undefined;
-  generateScheduleForDate: (date: string) => ScheduleResult; // stub for now
+  generateScheduleForDate: (date: string) => ScheduleResult;
 };
 
 function todayISO() {
@@ -73,6 +78,7 @@ export const useAppStore = create<AppState>()(
         search: '',
         schedulingType: 'all',
       },
+      scheduleCacheByDate: {},
 
       setUser(user) {
         set((s) => { s.user = user; });
@@ -87,24 +93,53 @@ export const useAppStore = create<AppState>()(
         set((s) => { s.ui.viewMode = mode; });
       },
 
+      async preloadCachedSchedule(date) {
+        const u = get().user as any;
+        if (!u || !u.uid) return;
+        try {
+          const cached = await getCachedSchedule(u.uid, date);
+          if (cached) set((s) => { s.scheduleCacheByDate[date] = cached; });
+        } catch (e) {
+          console.warn('Failed to preload cached schedule', e);
+        }
+      },
+
       setTaskTemplates(templates) {
-        set((s) => { s.templates = templates; });
+        set((s) => { s.templates = templates; s.scheduleCacheByDate = {}; });
       },
       upsertTaskTemplate(template) {
         set((s) => {
           const idx = s.templates.findIndex(t => t.id === template.id);
           if (idx >= 0) s.templates[idx] = template; else s.templates.push(template);
+          s.scheduleCacheByDate = {};
         });
       },
       removeTaskTemplate(id) {
-        set((s) => { s.templates = s.templates.filter(t => t.id !== id); });
+        set((s) => { s.templates = s.templates.filter(t => t.id !== id); s.scheduleCacheByDate = {}; });
       },
 
       setTaskInstancesForDate(date, instances) {
-        set((s) => { s.instancesByDate[date] = instances; });
+        set((s) => { s.instancesByDate[date] = instances; s.scheduleCacheByDate[date] = undefined; });
       },
 
-      toggleComplete(date, templateId) {
+      async loadInstancesForDate(date) {
+        const s = get();
+        const u = s.user as any;
+        if (!u || !u.uid) return;
+        try {
+          const items = await listInstancesByDate(u.uid, date);
+          set((st) => { st.instancesByDate[date] = items; });
+        } catch (e) {
+          console.warn("Failed to load task instances for", date, e);
+        }
+      },
+
+      async toggleComplete(date, templateId) {
+        const before = (get().instancesByDate[date] ?? []).map(x => ({ ...x }));
+        let action: 'complete' | 'undo' = 'complete';
+        let writePayload: TaskInstance | null = null;
+        let deleteId: string | null = null;
+
         set((s) => {
           const list = s.instancesByDate[date] ?? [];
           const idx = list.findIndex(i => i.templateId === templateId);
@@ -112,24 +147,43 @@ export const useAppStore = create<AppState>()(
             const inst = list[idx];
             if (inst.status === 'completed') {
               // Undo completion -> remove instance to return to pending baseline
+              action = 'undo';
+              deleteId = inst.id;
               s.instancesByDate[date] = [...list.slice(0, idx), ...list.slice(idx + 1)];
             } else {
               // Set to completed
-              const updated: TaskInstance = { ...inst, status: 'completed', completedAt: Date.now() };
+              const updated: TaskInstance = { ...inst, id: inst.id || instanceIdFor(date, templateId), status: 'completed', completedAt: Date.now() };
+              writePayload = updated;
               s.instancesByDate[date] = [...list.slice(0, idx), updated, ...list.slice(idx + 1)];
             }
           } else {
             // No instance yet -> create a completed instance
             const newInst: TaskInstance = {
-              id: `inst-${date}-${templateId}`,
+              id: instanceIdFor(date, templateId),
               templateId,
               date,
               status: 'completed',
               completedAt: Date.now(),
             };
+            writePayload = newInst;
             s.instancesByDate[date] = [...list, newInst];
           }
         });
+
+        const u = get().user as any;
+        if (!u || !u.uid) return true; // No persistence when signed out
+        try {
+          if (action === 'complete' && writePayload) {
+            await upsertInstance(u.uid, writePayload);
+          } else if (action === 'undo' && deleteId) {
+            await deleteInstance(u.uid, deleteId);
+          }
+          return true;
+        } catch (e) {
+          console.warn('Failed to persist toggleComplete; reverting', e);
+          set((s) => { s.instancesByDate[date] = before; });
+          return false;
+        }
       },
 
       resetAfterSignOut() {
@@ -138,6 +192,7 @@ export const useAppStore = create<AppState>()(
           s.templates = [];
           s.instancesByDate = {};
           s.settings = defaultSettings;
+          s.scheduleCacheByDate = {};
           s.ui.viewMode = 'timeline';
           s.ui.currentDate = todayISO();
           s.filters.search = '';
@@ -153,10 +208,20 @@ export const useAppStore = create<AppState>()(
       },
       generateScheduleForDate(date) {
         const s = get();
+        const cached = s.scheduleCacheByDate[date];
+        if (cached) return cached;
         const settings = s.settings ?? defaultSettings;
         const templates = s.templates;
         const instances = s.instancesByDate[date] ?? [];
-        return generateSchedule({ settings, templates, instances, date });
+        const result = generateSchedule({ settings, templates, instances, date });
+        set((st) => { st.scheduleCacheByDate[date] = result; });
+        // Best-effort: write cache to Firestore
+        const u = s.user as any;
+        if (u && u.uid && result.success) {
+          // Fire and forget
+          void putCachedSchedule(u.uid, date, result).catch((e) => console.warn('Failed to cache schedule', e));
+        }
+        return result;
       },
     })),
     { name: 'AppStore' }

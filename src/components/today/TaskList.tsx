@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import type { AppState } from "@/store/useAppStore";
 import type { ScheduleBlock, TaskInstance } from "@/lib/types";
+import { toast } from "sonner";
 
 export default function TaskList() {
   const date = useAppStore((s: AppState) => s.ui.currentDate);
@@ -44,7 +45,10 @@ export default function TaskList() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => toggleComplete(date, b.templateId)}
+                  onClick={async () => {
+                    const ok = await toggleComplete(date, b.templateId);
+                    if (ok) toast.success("Marked complete"); else toast.error("Failed to update");
+                  }}
                   className="px-2 py-1 rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
                 >
                   Complete
@@ -69,7 +73,10 @@ export default function TaskList() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => toggleComplete(date, i.templateId)}
+                  onClick={async () => {
+                    const ok = await toggleComplete(date, i.templateId);
+                    if (ok) toast.success("Marked pending"); else toast.error("Failed to update");
+                  }}
                   className="px-2 py-1 rounded-md bg-slate-700 text-white hover:bg-slate-800"
                 >
                   Undo

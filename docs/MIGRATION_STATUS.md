@@ -32,6 +32,10 @@ Update this file as tasks complete. Check items when merged into main.
 - [x] Minimal edit modal (core fields)
 - [x] Firestore CRUD + optimistic UI updates
 
+## Settings
+- [x] Editable form for `desiredSleepDuration`, `defaultWakeTime`, `defaultSleepTime`
+- [x] Persist to Firestore under `users/{uid}` and sync store
+
 ## PWA
 - [x] Manifest added and linked
 - [x] Default icons generated under `public/icons/`
@@ -43,7 +47,8 @@ Update this file as tasks complete. Check items when merged into main.
 
 ## CI
 - [x] GitHub Actions workflow runs lint/typecheck/test/build on PR
-- [ ] Pipeline required for merge
+- [x] Pipeline required for merge
+  - Configured in GitHub Branch Protection for `main` requiring `build-and-test` (aka `CI / build-and-test`) and up-to-date branches.
 
 ## Docs
 - [x] `docs/v2-migration-plan.md` updated with decisions and backlog

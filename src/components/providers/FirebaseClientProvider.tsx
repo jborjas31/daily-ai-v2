@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { type AuthUser, authApi, ensureFirestorePersistence } from "@/lib/firebase/client";
 import { useAppStore } from "@/store/useAppStore";
+import { getUserSettings } from "@/lib/data/settings";
 
 type AuthContextValue = {
   user: AuthUser;
@@ -31,7 +32,19 @@ export default function FirebaseClientProvider({ children }: { children: React.R
         // Reflect auth state in the app store
         const st = useAppStore.getState();
         st.setUser(u);
-        if (!u) st.resetAfterSignOut();
+        if (!u) {
+          st.resetAfterSignOut();
+        } else {
+          // Load persisted settings for this user (if present)
+          (async () => {
+            try {
+              const s = await getUserSettings(u.uid);
+              if (s) st.setSettings(s);
+            } catch (e) {
+              console.warn("Failed to load user settings", e);
+            }
+          })();
+        }
       });
     })();
     return () => {

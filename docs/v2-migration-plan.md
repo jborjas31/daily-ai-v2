@@ -10,7 +10,7 @@ This is the single, up‑to‑date plan to modernize the old vanilla web app in 
 - Firebase: Modular SDK (`firebase/app`, `firebase/auth`, `firebase/firestore`); enable Firestore offline persistence; email/password auth only.
 - Data model: Keep V1 Firestore structure unchanged (`/users/{userId}`, `tasks`, `task_instances`, `daily_schedules`).
 - Offline (MVP): Use Firestore built-in offline persistence; no custom queue yet.
-- UI Scope (MVP): Today — Timeline first (with a basic List), Library, Settings (read-only initially).
+- UI Scope (MVP): Today — Timeline first (with a basic List), Library, Settings (editable basic UI).
 - UX libs: Toasts via `sonner`; dialogs via Radix UI primitives; Tailwind for styling.
 - PWA: Add manifest + icons now; defer custom service worker.
 - Branding: Name “Daily AI”, short name “DailyAI”, theme color `#3B82F6`; generate default icons.
@@ -70,7 +70,7 @@ This is the single, up‑to‑date plan to modernize the old vanilla web app in 
 - Routes (Next.js App Router):
   - `src/app/today/page.tsx` — MVP list view; timeline later
   - `src/app/library/page.tsx` — task templates
-  - `src/app/settings/page.tsx` — read-only initially
+  - `src/app/settings/page.tsx` — editable basic UI with persistence
 - Layout:
   - `src/app/layout.tsx` — header (date, user), nav (Today/Library/Settings), global “Add Task” button
 - State (store):
@@ -184,24 +184,18 @@ Use `docs/MIGRATION_STATUS.md` to track progress as each step lands.
 - Completed: Library MVP (templates list, minimal CRUD with soft delete, duplicate, toggle).
 - Completed: PWA basics (manifest/icons, theme color, metadata linked).
 - Completed: CI pipeline (GitHub Actions for lint/type/test/build).
-- Next: Refine Settings UI and polish.
+- Completed: CI enforcement — branch protection requires "CI / build-and-test" and up-to-date branches.
+- Completed: Settings UI — editable form for `desiredSleepDuration`, `defaultWakeTime`, `defaultSleepTime` with validation; persisted to Firestore and synced to store.
+- Completed: Instances data module — `src/lib/data/instances.ts` (list by date, upsert with deterministic IDs, delete).
+- Completed: Store loader — `loadInstancesForDate(date)` fetches from Firestore and populates `instancesByDate`.
+- Completed: Today page loads instances on mount/date change using auth + store loader.
+- Completed: Write-through toggle — `toggleComplete` updates local state optimistically and persists to Firestore; reverts on failure.
+- Completed: TaskList UX polish — success/failure toasts after toggle using `sonner`.
+- Completed: Route guard hook — `useRequireAuth()` redirects to `/login` when unauthenticated and returns `{ user, ready }`.
+- Completed: Guards applied — `/today` and `/library` use `useRequireAuth()` and show a lightweight loader until ready.
+- Completed: Optional schedule cache — schedule results cached under `users/{uid}/daily_schedules/{date}`; store preloads cache and writes best‑effort after compute.
+- Completed: Store unit tests — added `src/store/useAppStore.test.ts` for `setUser`/`resetAfterSignOut`, settings impact on `generateScheduleForDate`, and `toggleComplete` transitions.
 
-## Remaining Actions To Complete This Plan
+## Remaining Actions — Bite‑Sized Steps
 
-1) Enforce CI as a required check for merges
-   - Configure GitHub branch protection on `main` to require the workflow "CI / build-and-test" before merging and require branches to be up to date.
-
-2) Implement editable Settings UI with persistence
-   - Add a form on `/settings` to edit `desiredSleepDuration`, `defaultWakeTime`, and `defaultSleepTime` with validation and save to Firestore; wire to the store.
-
-3) Persist Task Instances to Firestore
-   - Create `src/lib/data/instances.ts` (CRUD for `users/{uid}/task_instances`). Load instances for the selected date and update `toggleComplete` to write-through to Firestore (offline-friendly via persistence).
-
-4) Minimal route guards / redirects (client-side)
-   - Redirect unauthenticated users from `/today` and `/library` to `/login`; after sign-in, redirect to `/today`.
-
-5) Optional: Cache daily schedules
-   - Store computed schedules under `users/{uid}/daily_schedules/{date}` to speed up subsequent loads. Refresh cache when templates/instances change.
-
-6) Add store unit tests (slices/selectors)
-   - Tests for `setUser`, `setSettings`, `toggleComplete`, `generateScheduleForDate` to meet the DoD in this plan.
+(none)
