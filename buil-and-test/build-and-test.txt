@@ -1,0 +1,18 @@
+Run npm run lint
+
+> daily_ai_v2@0.1.0 lint
+> eslint
+
+
+/home/runner/work/daily-ai-v2/daily-ai-v2/src/app/today/page.tsx
+Error:   79:71  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/runner/work/daily-ai-v2/daily-ai-v2/src/components/ui/ScopeDialog.tsx
+Error:   62:76  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/runner/work/daily-ai-v2/daily-ai-v2/src/lib/data/instances.ts
+Warning:   37:15  warning  '_ignored' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+✖ 3 problems (2 errors, 1 warning)
+
+Error: Process completed with exit code 1.

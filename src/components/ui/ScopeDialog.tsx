@@ -59,7 +59,10 @@ export default function ScopeDialog({
                 <select
                   aria-labelledby={statusLabelId}
                   value={statusChoice}
-                  onChange={(e)=>setStatusChoice((e.target.value || '') as any)}
+                  onChange={(e)=>{
+                    const val = (e.target.value || '') as '' | InstanceStatus;
+                    setStatusChoice(val);
+                  }}
                   className="w-full border rounded-md px-2 py-1.5 bg-white dark:bg-slate-900"
                 >
                   <option value="">No change</option>

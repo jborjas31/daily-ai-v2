@@ -76,7 +76,12 @@ export default function TodayPage() {
           }
           try {
             // Only create path for Today modal
-            const created = await createTemplate(user.uid, payload as any);
+            if ('id' in payload) {
+              // Today modal should not receive edit payloads
+              toastError('save');
+              return;
+            }
+            const created = await createTemplate(user.uid, payload);
             upsert(created);
             toastSuccess('create');
           } catch {
