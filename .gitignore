@@ -16,6 +16,10 @@
 # next.js
 /.next/
 /out/
+/.firebase/
+.vitest-report.json
+/debugging/
+/console_log/
 
 # production
 /build
