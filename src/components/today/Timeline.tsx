@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import type { TaskTemplate } from "@/lib/types";
 import { toMinutes } from "@/lib/time";
+import { motion, type PanInfo } from "framer-motion";
+import { toast } from "sonner";
 
 const ROW_HEIGHT = 64; // px per hour (mobile-first)
 const TOTAL_MINUTES = 24 * 60;
@@ -55,7 +57,8 @@ export default function Timeline() {
     const bg = isMandatory ? 'bg-rose-500/70' : isFixed ? 'bg-blue-500/70' : 'bg-green-500/70';
     const border = isMandatory ? 'border-rose-700/70' : isFixed ? 'border-blue-700/70' : 'border-green-700/70';
     const label = t?.taskName ?? b.templateId;
-    return { top, height, bg, border, label, id: b.templateId, start: b.startTime, end: b.endTime };
+    const draggable = !isMandatory; // keep it minimal: draggable when not mandatory
+    return { top, height, bg, border, label, id: b.templateId, start: b.startTime, end: b.endTime, draggable, dur };
   });
 
   const hours = useMemo(() => Array.from({ length: 25 }, (_, i) => i), []);
@@ -106,16 +109,37 @@ export default function Timeline() {
         />
 
         {/* Scheduled blocks */}
-        {blocks.map((b) => (
-          <div
-            key={b.id + b.start}
-            className={`absolute left-[80px] right-3 ${b.bg} ${b.border} border rounded-md text-[12px] text-white shadow-sm p-2`}
-            style={{ top: b.top, height: b.height }}
-          >
-            <div className="font-medium truncate">{b.label}</div>
-            <div className="opacity-90">{b.start}–{b.end}</div>
-          </div>
-        ))}
+        {blocks.map((b) => {
+          const key = b.id + b.start;
+          const dragProps = b.draggable ? {
+            drag: "y" as const,
+            dragMomentum: false,
+            onDragEnd: async (_: unknown, info: PanInfo) => {
+              const newTopPx = b.top + info.offset.y;
+              const maxTopPx = minutesToY(TOTAL_MINUTES - b.dur);
+              const boundedTop = Math.max(0, Math.min(newTopPx, maxTopPx));
+              const newStartMinsRaw = (boundedTop / ROW_HEIGHT) * 60;
+              // snap to 5 minute increments
+              const snapped = Math.round(newStartMinsRaw / 5) * 5;
+              const hrs = Math.floor(snapped / 60);
+              const mins = snapped % 60;
+              const startStr = `${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}`;
+              const ok = await useAppStore.getState().setInstanceStartTime(useAppStore.getState().ui.currentDate, b.id, startStr);
+              if (ok) toast.success("Position updated"); else toast.error("Failed to update position");
+            },
+          } : {};
+          return (
+            <motion.div
+              key={key}
+              className={`absolute left-[80px] right-3 ${b.bg} ${b.border} border rounded-md text-[12px] text-white shadow-sm p-2 ${b.draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
+              style={{ top: b.top, height: b.height }}
+              {...dragProps}
+            >
+              <div className="font-medium truncate">{b.label}</div>
+              <div className="opacity-90">{b.start}–{b.end}{b.draggable ? ' • drag to move' : ''}</div>
+            </motion.div>
+          );
+        })}
       </div>
     </div>
   );

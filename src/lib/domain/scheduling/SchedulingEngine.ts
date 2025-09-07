@@ -121,7 +121,10 @@ export function generateSchedule(input: SchedulingInput): ScheduleResult {
 
   // Filter templates: active, occurs on date, not completed/skipped
   const excluded = excludeCompletedOrSkipped(instances);
-  const active = templates.filter(t => (t.isActive !== false)).filter(t => !excluded.has(t.id)).filter(t => templateOccursOnDate(t, date));
+  const active = templates
+    .filter(t => (t.isActive !== false))
+    .filter(t => !excluded.has(t.id))
+    .filter(t => templateOccursOnDate(t, date));
 
   // Impossibility check: mandatory total duration must fit into awake window
   const mandatoryTotal = active.filter(t => t.isMandatory).reduce((sum, t) => sum + Math.max(0, t.durationMinutes || 0), 0);
@@ -141,7 +144,28 @@ export function generateSchedule(input: SchedulingInput): ScheduleResult {
   const busy: BusyInterval[] = [];
   const schedule: ScheduleBlock[] = [];
 
-  const fixed = active.filter(t => t.schedulingType === 'fixed' && t.defaultTime);
+  // Manual overrides: instances with modifiedStartTime anchor a task at that time
+  const overrides = new Map<string, number>(); // templateId -> start minutes
+  for (const i of instances) {
+    if (i.modifiedStartTime && i.status !== 'completed' && i.status !== 'skipped') {
+      overrides.set(i.templateId, toMinutes(i.modifiedStartTime as TimeString));
+    }
+  }
+  const handled = new Set<string>();
+
+  // Apply overrides first as anchors
+  for (const t of active) {
+    const o = overrides.get(t.id);
+    if (o != null) {
+      const start = o;
+      const end = start + (t.durationMinutes || 0);
+      pushBusy(busy, start, end, t.isMandatory === true);
+      schedule.push({ templateId: t.id, startTime: fromMinutes(start), endTime: fromMinutes(end) });
+      handled.add(t.id);
+    }
+  }
+
+  const fixed = active.filter(t => t.schedulingType === 'fixed' && t.defaultTime && !handled.has(t.id));
   for (const t of fixed) {
     const start = toMinutes(t.defaultTime as TimeString);
     const end = start + (t.durationMinutes || 0);
@@ -200,4 +224,3 @@ export function generateSchedule(input: SchedulingInput): ScheduleResult {
     advisories: advisories.length ? advisories : undefined,
   };
 }
-

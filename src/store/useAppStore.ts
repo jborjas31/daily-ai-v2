@@ -44,6 +44,7 @@ type AppState = {
   setTaskInstancesForDate: (date: string, instances: TaskInstance[]) => void;
   loadInstancesForDate: (date: string) => Promise<void>;
   toggleComplete: (date: string, templateId: string) => Promise<boolean>;
+  setInstanceStartTime: (date: string, templateId: string, start: string) => Promise<boolean>;
   resetAfterSignOut: () => void;
 
   // Selectors
@@ -131,6 +132,44 @@ export const useAppStore = create<AppState>()(
           set((st) => { st.instancesByDate[date] = items; });
         } catch (e) {
           console.warn("Failed to load task instances for", date, e);
+        }
+      },
+
+      async setInstanceStartTime(date, templateId, start) {
+        const before = (get().instancesByDate[date] ?? []).map(x => ({ ...x }));
+        // Optimistic local update
+        let updated: TaskInstance | null = null;
+        set((s) => {
+          const list = s.instancesByDate[date] ?? [];
+          const idx = list.findIndex(i => i.templateId === templateId);
+          if (idx >= 0) {
+            const inst = list[idx];
+            updated = { ...inst, modifiedStartTime: start, status: inst.status || 'pending' } as TaskInstance;
+            s.instancesByDate[date] = [...list.slice(0, idx), updated, ...list.slice(idx + 1)];
+          } else {
+            const newInst: TaskInstance = {
+              id: instanceIdFor(date, templateId),
+              templateId,
+              date,
+              status: 'pending',
+              modifiedStartTime: start,
+            };
+            updated = newInst;
+            s.instancesByDate[date] = [...list, newInst];
+          }
+          // Invalidate schedule cache for this date
+          s.scheduleCacheByDate[date] = undefined;
+        });
+
+        const u = get().user;
+        if (!u) return true;
+        try {
+          if (updated) await upsertInstance(u.uid, updated);
+          return true;
+        } catch (e) {
+          console.warn('Failed to persist setInstanceStartTime; reverting', e);
+          set((s) => { s.instancesByDate[date] = before; });
+          return false;
         }
       },
 
