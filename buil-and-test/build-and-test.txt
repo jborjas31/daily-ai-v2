@@ -1,18 +1,11 @@
-Run npm run lint
+Run npm run typecheck
 
-> daily_ai_v2@0.1.0 lint
-> eslint
+> daily_ai_v2@0.1.0 typecheck
+> tsc -p tsconfig.json --noEmit
 
-
-/home/runner/work/daily-ai-v2/daily-ai-v2/src/app/today/page.tsx
-Error:   79:71  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
-
-/home/runner/work/daily-ai-v2/daily-ai-v2/src/components/ui/ScopeDialog.tsx
-Error:   62:76  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
-
-/home/runner/work/daily-ai-v2/daily-ai-v2/src/lib/data/instances.ts
-Warning:   37:15  warning  '_ignored' is assigned a value but never used  @typescript-eslint/no-unused-vars
-
-✖ 3 problems (2 errors, 1 warning)
-
-Error: Process completed with exit code 1.
+Error: src/app/library/page.tsx(180,9): error TS2304: Cannot find name 'toastResult'.
+Error: src/app/library/page.tsx(192,45): error TS2304: Cannot find name 'toastResult'.
+Error: src/app/library/page.tsx(193,48): error TS2304: Cannot find name 'toastResult'.
+Error: src/app/library/page.tsx(194,50): error TS2304: Cannot find name 'toastResult'.
+Error: src/app/library/page.tsx(195,14): error TS2304: Cannot find name 'toastResult'.
+Error: Process completed with exit code 2.

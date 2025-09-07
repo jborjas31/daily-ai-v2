@@ -11,7 +11,7 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import ScopeDialog, { type EditScope } from "@/components/ui/ScopeDialog";
 import TaskModal from "@/components/library/TaskModal";
 import { toast, } from "sonner";
-import { toastError, toastSuccess } from "@/lib/ui/toast";
+import { toastError, toastSuccess, toastResult } from "@/lib/ui/toast";
 
 export default function LibraryPage() {
   const { user, ready } = useRequireAuth();
