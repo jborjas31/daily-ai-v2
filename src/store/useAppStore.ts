@@ -136,7 +136,6 @@ export const useAppStore = create<AppState>()(
 
       async toggleComplete(date, templateId) {
         const before = (get().instancesByDate[date] ?? []).map(x => ({ ...x }));
-        let action: 'complete' | 'undo' = 'complete';
         let writePayload: TaskInstance | null = null;
         let deleteId: string | null = null;
 
@@ -147,7 +146,6 @@ export const useAppStore = create<AppState>()(
             const inst = list[idx];
             if (inst.status === 'completed') {
               // Undo completion -> remove instance to return to pending baseline
-              action = 'undo';
               deleteId = inst.id;
               s.instancesByDate[date] = [...list.slice(0, idx), ...list.slice(idx + 1)];
             } else {
@@ -173,10 +171,10 @@ export const useAppStore = create<AppState>()(
         const u = get().user;
         if (!u) return true; // No persistence when signed out
         try {
-          if (action === 'complete' && writePayload) {
-            await upsertInstance(u.uid, writePayload);
-          } else if (action === 'undo' && deleteId) {
+          if (deleteId) {
             await deleteInstance(u.uid, deleteId);
+          } else if (writePayload) {
+            await upsertInstance(u.uid, writePayload);
           }
           return true;
         } catch (e) {
