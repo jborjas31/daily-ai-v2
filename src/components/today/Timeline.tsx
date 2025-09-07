@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import type { TaskTemplate } from "@/lib/types";
 import { toMinutes } from "@/lib/time";
 import { motion, type PanInfo } from "framer-motion";
-import { toast } from "sonner";
+import { toastResult } from "@/lib/ui/toast";
 
 const ROW_HEIGHT = 64; // px per hour (mobile-first)
 const TOTAL_MINUTES = 24 * 60;
@@ -35,6 +36,26 @@ export default function Timeline() {
   const scheduleRes = useAppStore((s) => s.generateScheduleForDate(currentDate));
   const containerRef = useRef<HTMLDivElement>(null);
   const nowMins = useNowMinutes();
+  const setNewTaskPrefill = useAppStore((s) => s.setNewTaskPrefill);
+
+  function handleGridClick(e: ReactMouseEvent<HTMLDivElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const height = e.currentTarget.clientHeight;
+    const boundedY = Math.max(0, Math.min(y, height));
+    const minutesRaw = (boundedY / ROW_HEIGHT) * 60;
+    const snapped = Math.round(minutesRaw / 5) * 5;
+    const hrs = Math.floor(snapped / 60);
+    const mins = snapped % 60;
+    const startStr = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    // Step 2.3.6/2.3.7: compute clicked time and suggested window
+    let win: 'morning' | 'afternoon' | 'evening' | 'anytime' = 'anytime';
+    if (snapped >= 6 * 60 && snapped < 12 * 60) win = 'morning';
+    else if (snapped >= 12 * 60 && snapped < 18 * 60) win = 'afternoon';
+    else if (snapped >= 18 * 60 && snapped < 23 * 60) win = 'evening';
+    // Write prefill to store for New Task modal
+    setNewTaskPrefill({ time: startStr, window: win });
+  }
 
   // Auto-scroll to now on mount (keep near center) if within the day
   useEffect(() => {
@@ -80,8 +101,8 @@ export default function Timeline() {
   }, [wake, sleep]);
 
   return (
-    <div className="relative border rounded-lg overflow-hidden max-h-[80vh]" ref={containerRef}>
-      <div className="relative" style={{ height: `${ROW_HEIGHT * 24}px` }}>
+    <div className="relative border rounded-lg overflow-hidden max-h-[80svh] overscroll-contain touch-pan-y" ref={containerRef}>
+      <div className="relative select-none" style={{ height: `${ROW_HEIGHT * 24}px` }} onClick={handleGridClick}>
         {/* Sleep shading */}
         {sleepSegments.map((s, idx) => (
           <div
@@ -125,7 +146,7 @@ export default function Timeline() {
               const mins = snapped % 60;
               const startStr = `${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}`;
               const ok = await useAppStore.getState().setInstanceStartTime(useAppStore.getState().ui.currentDate, b.id, startStr);
-              if (ok) toast.success("Position updated"); else toast.error("Failed to update position");
+              toastResult('update', ok);
             },
           } : {};
           return (

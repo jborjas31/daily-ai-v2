@@ -6,6 +6,7 @@ import type { AppState } from "@/store/useAppStore";
 import type { Settings } from "@/lib/types";
 import { getUserSettings, saveUserSettings } from "@/lib/data/settings";
 import { toast } from "sonner";
+import { toastError, toastSuccess } from "@/lib/ui/toast";
 
 type Errors = Partial<Record<keyof Settings, string>>;
 
@@ -80,9 +81,9 @@ export default function SettingsPage() {
       };
       await saveUserSettings(user.uid, payload);
       setSettings(payload);
-      toast.success("Settings saved");
+      toastSuccess('save');
     } catch {
-      toast.error("Failed to save settings");
+      toastError('save');
     } finally {
       setSaving(false);
     }

@@ -3,7 +3,7 @@ import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import type { AuthUser } from "@/lib/firebase/client";
-import type { Settings, TaskTemplate, TaskInstance, ScheduleResult } from "@/lib/types";
+import type { Settings, TaskTemplate, TaskInstance, ScheduleResult, TimeWindow, TimeString } from "@/lib/types";
 import { generateSchedule } from "@/lib/domain/scheduling/SchedulingEngine";
 import { listInstancesByDate, upsertInstance, deleteInstance, instanceIdFor } from "@/lib/data/instances";
 import { getCachedSchedule, putCachedSchedule } from "@/lib/data/schedules";
@@ -16,6 +16,7 @@ type FiltersState = {
 type UiState = {
   viewMode: 'timeline' | 'list';
   currentDate: string; // YYYY-MM-DD
+  newTaskPrefill: { time?: TimeString; window?: TimeWindow } | null;
 };
 
 type AppState = {
@@ -35,6 +36,7 @@ type AppState = {
   setSettings: (settings: Settings) => void;
   setCurrentDate: (date: string) => void;
   setViewMode: (mode: UiState['viewMode']) => void;
+  setNewTaskPrefill: (prefill: UiState['newTaskPrefill']) => void;
   preloadCachedSchedule: (date: string) => Promise<void>;
 
   setTaskTemplates: (templates: TaskTemplate[]) => void;
@@ -44,6 +46,9 @@ type AppState = {
   setTaskInstancesForDate: (date: string, instances: TaskInstance[]) => void;
   loadInstancesForDate: (date: string) => Promise<void>;
   toggleComplete: (date: string, templateId: string) => Promise<boolean>;
+  skipInstance: (date: string, templateId: string, reason?: string) => Promise<boolean>;
+  postponeInstance: (date: string, templateId: string, note?: string) => Promise<boolean>;
+  undoInstanceStatus: (date: string, templateId: string) => Promise<boolean>;
   setInstanceStartTime: (date: string, templateId: string, start: string) => Promise<boolean>;
   resetAfterSignOut: () => void;
 
@@ -51,6 +56,7 @@ type AppState = {
   getTaskInstancesForDate: (date: string) => TaskInstance[];
   getTemplateById: (id: string) => TaskTemplate | undefined;
   generateScheduleForDate: (date: string) => ScheduleResult;
+  getNewTaskPrefill: () => UiState['newTaskPrefill'];
 };
 
 function todayISO() {
@@ -74,6 +80,7 @@ export const useAppStore = create<AppState>()(
       ui: {
         viewMode: 'timeline',
         currentDate: todayISO(),
+        newTaskPrefill: null,
       },
       filters: {
         search: '',
@@ -92,6 +99,10 @@ export const useAppStore = create<AppState>()(
       },
       setViewMode(mode) {
         set((s) => { s.ui.viewMode = mode; });
+      },
+
+      setNewTaskPrefill(prefill) {
+        set((s) => { s.ui.newTaskPrefill = prefill; });
       },
 
       async preloadCachedSchedule(date) {
@@ -129,7 +140,11 @@ export const useAppStore = create<AppState>()(
         if (!u) return;
         try {
           const items = await listInstancesByDate(u.uid, date);
-          set((st) => { st.instancesByDate[date] = items; });
+          set((st) => {
+            st.instancesByDate[date] = items;
+            // Invalidate schedule cache when instances change
+            st.scheduleCacheByDate[date] = undefined;
+          });
         } catch (e) {
           console.warn("Failed to load task instances for", date, e);
         }
@@ -205,6 +220,8 @@ export const useAppStore = create<AppState>()(
             writePayload = newInst;
             s.instancesByDate[date] = [...list, newInst];
           }
+          // Invalidate schedule cache for this date
+          s.scheduleCacheByDate[date] = undefined;
         });
 
         const u = get().user;
@@ -218,6 +235,144 @@ export const useAppStore = create<AppState>()(
           return true;
         } catch (e) {
           console.warn('Failed to persist toggleComplete; reverting', e);
+          set((s) => { s.instancesByDate[date] = before; });
+          return false;
+        }
+      },
+
+      async skipInstance(date, templateId, reason) {
+        const before = (get().instancesByDate[date] ?? []).map(x => ({ ...x }));
+        let writePayload: TaskInstance | null = null;
+
+        set((s) => {
+          const list = s.instancesByDate[date] ?? [];
+          const idx = list.findIndex(i => i.templateId === templateId);
+          if (idx >= 0) {
+            const inst = list[idx];
+            const updated: TaskInstance = {
+              ...inst,
+              id: inst.id || instanceIdFor(date, templateId),
+              status: 'skipped',
+              ...(typeof reason === 'string' ? { skippedReason: reason, note: reason } : {}),
+            };
+            writePayload = updated;
+            s.instancesByDate[date] = [...list.slice(0, idx), updated, ...list.slice(idx + 1)];
+          } else {
+            const newInst: TaskInstance = {
+              id: instanceIdFor(date, templateId),
+              templateId,
+              date,
+              status: 'skipped',
+              ...(typeof reason === 'string' ? { skippedReason: reason, note: reason } : {}),
+            };
+            writePayload = newInst;
+            s.instancesByDate[date] = [...list, newInst];
+          }
+          // Invalidate schedule cache for this date
+          s.scheduleCacheByDate[date] = undefined;
+        });
+
+        const u = get().user;
+        if (!u) return true;
+        try {
+          if (writePayload) await upsertInstance(u.uid, writePayload);
+          return true;
+        } catch (e) {
+          console.warn('Failed to persist skipInstance; reverting', e);
+          set((s) => { s.instancesByDate[date] = before; });
+          return false;
+        }
+      },
+
+      async postponeInstance(date, templateId, note) {
+        const before = (get().instancesByDate[date] ?? []).map(x => ({ ...x }));
+        let writePayload: TaskInstance | null = null;
+
+        set((s) => {
+          const list = s.instancesByDate[date] ?? [];
+          const idx = list.findIndex(i => i.templateId === templateId);
+          if (idx >= 0) {
+            const inst = list[idx];
+            const updated: TaskInstance = {
+              ...inst,
+              id: inst.id || instanceIdFor(date, templateId),
+              status: 'postponed',
+              ...(typeof note === 'string' ? { note } : {}),
+            };
+            writePayload = updated;
+            s.instancesByDate[date] = [...list.slice(0, idx), updated, ...list.slice(idx + 1)];
+          } else {
+            const newInst: TaskInstance = {
+              id: instanceIdFor(date, templateId),
+              templateId,
+              date,
+              status: 'postponed',
+              ...(typeof note === 'string' ? { note } : {}),
+            };
+            writePayload = newInst;
+            s.instancesByDate[date] = [...list, newInst];
+          }
+          // Invalidate schedule cache for this date
+          s.scheduleCacheByDate[date] = undefined;
+        });
+
+        const u = get().user;
+        if (!u) return true;
+        try {
+          if (writePayload) await upsertInstance(u.uid, writePayload);
+          return true;
+        } catch (e) {
+          console.warn('Failed to persist postponeInstance; reverting', e);
+          set((s) => { s.instancesByDate[date] = before; });
+          return false;
+        }
+      },
+
+      async undoInstanceStatus(date, templateId) {
+        const before = (get().instancesByDate[date] ?? []).map(x => ({ ...x }));
+        let writePayload: TaskInstance | null = null;
+        let deleteId: string | null = null;
+
+        set((s) => {
+          const list = s.instancesByDate[date] ?? [];
+          const idx = list.findIndex(i => i.templateId === templateId);
+          if (idx < 0) {
+            // Nothing to undo
+            return;
+          }
+          const inst = list[idx];
+          const hasOverride = !!inst.modifiedStartTime;
+          if (hasOverride) {
+            // Preserve overrides but clear status back to pending
+            const updated: TaskInstance = {
+              ...inst,
+              id: inst.id || instanceIdFor(date, templateId),
+              status: 'pending',
+              completedAt: undefined,
+              skippedReason: undefined,
+            };
+            writePayload = updated;
+            s.instancesByDate[date] = [...list.slice(0, idx), updated, ...list.slice(idx + 1)];
+          } else {
+            // No overrides -> remove instance entirely to return to baseline pending
+            deleteId = inst.id || instanceIdFor(date, templateId);
+            s.instancesByDate[date] = [...list.slice(0, idx), ...list.slice(idx + 1)];
+          }
+          // Invalidate schedule cache for this date
+          s.scheduleCacheByDate[date] = undefined;
+        });
+
+        const u = get().user;
+        if (!u) return true;
+        try {
+          if (deleteId) {
+            await deleteInstance(u.uid, deleteId);
+          } else if (writePayload) {
+            await upsertInstance(u.uid, writePayload);
+          }
+          return true;
+        } catch (e) {
+          console.warn('Failed to persist undoInstanceStatus; reverting', e);
           set((s) => { s.instancesByDate[date] = before; });
           return false;
         }
@@ -259,6 +414,9 @@ export const useAppStore = create<AppState>()(
           void putCachedSchedule(u.uid, date, result).catch((e) => console.warn('Failed to cache schedule', e));
         }
         return result;
+      },
+      getNewTaskPrefill() {
+        return get().ui.newTaskPrefill;
       },
     })),
     { name: 'AppStore' }

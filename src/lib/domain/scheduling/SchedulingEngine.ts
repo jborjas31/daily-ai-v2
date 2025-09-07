@@ -37,7 +37,7 @@ function templateOccursOnDate(t: TaskTemplate, date: string): boolean {
 function excludeCompletedOrSkipped(instances: TaskInstance[]): Set<string> {
   const s = new Set<string>();
   for (const i of instances) {
-    if (i.status === 'completed' || i.status === 'skipped') s.add(i.templateId);
+    if (i.status === 'completed' || i.status === 'skipped' || i.status === 'postponed') s.add(i.templateId);
   }
   return s;
 }
@@ -119,7 +119,7 @@ export function generateSchedule(input: SchedulingInput): ScheduleResult {
   const sleepMin = toMinutes(sleep.sleepTime);
   const awakeTotal = awakeMinutesBetween(sleep.wakeTime, sleep.sleepTime);
 
-  // Filter templates: active, occurs on date, not completed/skipped
+  // Filter templates: active, occurs on date, not completed/skipped/postponed
   const excluded = excludeCompletedOrSkipped(instances);
   const active = templates
     .filter(t => (t.isActive !== false))
@@ -147,7 +147,7 @@ export function generateSchedule(input: SchedulingInput): ScheduleResult {
   // Manual overrides: instances with modifiedStartTime anchor a task at that time
   const overrides = new Map<string, number>(); // templateId -> start minutes
   for (const i of instances) {
-    if (i.modifiedStartTime && i.status !== 'completed' && i.status !== 'skipped') {
+    if (i.modifiedStartTime && i.status !== 'completed' && i.status !== 'skipped' && i.status !== 'postponed') {
       overrides.set(i.templateId, toMinutes(i.modifiedStartTime as TimeString));
     }
   }

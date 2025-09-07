@@ -35,6 +35,7 @@ export interface TaskInstance {
   modifiedStartTime?: TimeString;
   completedAt?: number; // epoch ms
   skippedReason?: string;
+  note?: string;
 }
 
 export interface ScheduleBlock {

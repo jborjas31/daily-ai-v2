@@ -91,4 +91,21 @@ describe('SchedulingEngine (pure)', () => {
     const toMin = (s: string) => parseInt(s.slice(0,2))*60 + parseInt(s.slice(3,5));
     expect(toMin(groceries2!.startTime)).toBeGreaterThanOrEqual(15*60 + 30);
   });
+
+  it('Postponed instances are excluded from scheduling for the date', () => {
+    const settings = baseSettings();
+    const date = '2025-02-01';
+    const templates: TaskTemplate[] = [
+      { id: 't1', taskName: 'Should Not Schedule', isMandatory: false, isActive: true, priority: 3, schedulingType: 'flexible', timeWindow: 'anytime', durationMinutes: 30 },
+      { id: 't2', taskName: 'Should Schedule', isMandatory: false, isActive: true, priority: 3, schedulingType: 'flexible', timeWindow: 'anytime', durationMinutes: 30 },
+    ];
+    const instances: TaskInstance[] = [
+      { id: 'inst1', templateId: 't1', date, status: 'postponed' },
+    ];
+    const res = generateSchedule({ settings, templates, instances, date });
+    expect(res.success).toBe(true);
+    const ids = res.schedule.map(b => b.templateId);
+    expect(ids).not.toContain('t1');
+    expect(ids).toContain('t2');
+  });
 });

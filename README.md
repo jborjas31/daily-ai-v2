@@ -28,12 +28,33 @@ Open http://localhost:3000 and navigate to `/today`.
 
 ## Features (MVP)
 
-- Today view: timeline (24h grid, sleep shading, now‑line) plus a basic list
+- Today: timeline (24h grid, sleep shading, now‑line) + basic list
+- Timeline DnD: drag non‑mandatory blocks vertically to reposition; snaps to 5‑minute increments and persists
 - Library: manage task templates (enable/disable, duplicate, soft delete, edit/create)
-- Settings: read‑only placeholder (editable UI coming next)
-- Auth: client‑side Firebase Auth (email/password); sign out in header
+- Settings: editable form (sleep duration, default wake/sleep times) with validation and Firestore persistence
+- Auth: client‑side Firebase Auth (email/password); `/login` route; route guards redirect unauthenticated users
 - Offline: Firestore offline persistence enabled
+- Schedule cache: best‑effort cache of computed schedules under `users/{uid}/daily_schedules/{date}`
 - PWA basics: manifest + icons (no custom service worker yet)
+
+## Task Actions & Recurrence
+
+- Today actions
+  - Pending tasks show Complete, Skip, and Postpone.
+  - Completed/Skipped/Postponed sections show Undo to return to Pending.
+  - Optional inline notes: add a reason to Skipped or a note to Postponed items.
+  - Drag blocks on the Timeline to adjust start time (5‑minute snap); changes persist.
+
+- Validation & modals
+  - Task modal validates inputs inline (name, priority, durations, fixed time) and disables Save while invalid or saving.
+  - Modals are accessible (title/description wiring) and full‑screen on mobile.
+
+- Recurrence edit scope (Library)
+  - When editing a recurring task, a Scope dialog asks how to apply changes:
+    - Only this: per‑date override (supports time change; optional status override)
+    - This and future: splits the series at the selected date (old gets endDate; new copy starts at target date)
+    - All: apply to the entire series
+  - Scope dialog: `src/components/ui/ScopeDialog.tsx`
 
 ## Tech Stack
 
@@ -41,16 +62,27 @@ Open http://localhost:3000 and navigate to `/today`.
 - Zustand store with `immer` and `devtools`
 - Firebase modular SDK: Auth + Firestore
 - Domain logic: pure modules in `src/lib/domain/scheduling` (Recurrence, SchedulingEngine)
+- Framer Motion for lightweight Timeline drag‑and‑drop
+- Toasts via `sonner`, dialogs via Radix
 - Tests: Vitest
+
+### Toasts
+
+- Use the centralized helpers in `src/lib/ui/toast.ts` to keep copy consistent across the app.
+  - `toastSuccess('save'|'create'|'delete'|'update'|'complete'|'pending'|'skip'|'postpone'|'duplicate'|'enable'|'disable'|'signin')`
+  - `toastError(...)` mirrors the same actions (e.g., "Failed to save").
+  - `toastResult(action, ok)` dispatches success or error based on a boolean.
+  - Keep custom messages (e.g., "Sign in required", detailed error codes) where specificity helps.
 
 ## Scripts
 
 - `npm run dev` — start dev server
-- `npm run build` — production build
+- `npm run build` — production build (static export; see Deploy)
 - `npm run start` — start production server
 - `npm run lint` — run ESLint
 - `npm run typecheck` — TypeScript type check
 - `npm run test` — run unit tests (Vitest)
+- `npm run test:watch` — watch mode for Vitest
 
 ## Project Structure (key paths)
 
@@ -60,6 +92,8 @@ Open http://localhost:3000 and navigate to `/today`.
 - `src/lib/domain/scheduling/` — Recurrence + SchedulingEngine (pure)
 - `src/lib/firebase/client.ts` — Firebase client init + persistence
 - `src/lib/data/templates.ts` — Firestore template CRUD helpers
+- `src/lib/data/instances.ts` — Firestore CRUD for `task_instances` (write‑through on toggle)
+- `src/lib/data/schedules.ts` — cache helpers for computed schedules
 - `public/manifest.webmanifest` — PWA manifest + `public/icons/*`
 
 ## Data Model
@@ -67,7 +101,7 @@ Open http://localhost:3000 and navigate to `/today`.
 - Firestore collections (per user):
   - `/users/{userId}` — Settings
   - `/users/{userId}/tasks` — Task templates (active/soft‑deleted)
-  - `/users/{userId}/task_instances` — Daily task modifications
+  - `/users/{userId}/task_instances` — Daily task modifications and overrides (e.g., `modifiedStartTime`)
   - `/users/{userId}/daily_schedules` — Per‑day sleep overrides
 
 ## Docs & Migration
@@ -81,3 +115,22 @@ Open http://localhost:3000 and navigate to `/today`.
 
 - Time handling is local device time only (no time zones). Times are stored as `HH:MM` strings.
 - Service worker is deferred to post‑MVP; manifest/icons are present for installability.
+
+## Deploy
+
+- Static export is enabled via `next.config.ts` (`output: 'export'`).
+- Firebase Hosting deploy runs a fresh build automatically (see `firebase.json` predeploy):
+  - `firebase deploy --only hosting`
+- If deploying locally from scratch:
+  - `rm -rf .next out && npm ci && npm run build && firebase deploy --only hosting`
+
+## CI & Branch Protection
+
+- GitHub Actions pipeline runs lint, typecheck, test, and build on PRs.
+- Main branch protection requires the status check `CI / build-and-test` and branches to be up to date.
+- Optional script to enforce this via API: `.github/scripts/enforce-branch-protection.sh`.
+
+## Local Environment
+
+- Recommended Node: v20 (matches CI). Vitest may crash under Node 22 in some environments.
+- Sign in via email/password on `/login`. Guards redirect to `/login` when unauthenticated.

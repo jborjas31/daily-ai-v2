@@ -5,19 +5,54 @@ import { useAppStore } from "@/store/useAppStore";
 import type { AppState } from "@/store/useAppStore";
 import type { TaskTemplate } from "@/lib/types";
 import { listTemplates, updateTemplate, duplicateTemplate, softDeleteTemplate, createTemplate } from "@/lib/data/templates";
+import type { RecurrenceRule } from "@/lib/domain/scheduling/Recurrence";
+import { formatDate } from "@/lib/domain/scheduling/Recurrence";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import ScopeDialog, { type EditScope } from "@/components/ui/ScopeDialog";
 import TaskModal from "@/components/library/TaskModal";
-import { toast } from "sonner";
+import { toast, } from "sonner";
+import { toastError, toastSuccess } from "@/lib/ui/toast";
 
 export default function LibraryPage() {
   const { user, ready } = useRequireAuth();
   const templates = useAppStore((s: AppState) => s.templates);
   const setTaskTemplates = useAppStore((s: AppState) => s.setTaskTemplates);
   const upsert = useAppStore((s: AppState) => s.upsertTaskTemplate);
+  const currentDate = useAppStore((s: AppState) => s.ui.currentDate);
+  const setInstanceStartTime = useAppStore((s: AppState) => s.setInstanceStartTime);
+  const toggleComplete = useAppStore((s: AppState) => s.toggleComplete);
+  const skipInstance = useAppStore((s: AppState) => s.skipInstance);
+  const postponeInstance = useAppStore((s: AppState) => s.postponeInstance);
+  const undoInstanceStatus = useAppStore((s: AppState) => s.undoInstanceStatus);
   const [loading, setLoading] = useState(false);
   const [confirm, setConfirm] = useState<{ id: string; name: string } | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<TaskTemplate | null>(null);
+  const [scopeOpen, setScopeOpen] = useState(false);
+  const [pendingEdit, setPendingEdit] = useState<{ prev: TaskTemplate; next: TaskTemplate } | null>(null);
+
+  function isRecurringTemplate(t: TaskTemplate | null | undefined): boolean {
+    if (!t) return false;
+    const freq = ((t.recurrenceRule as unknown as RecurrenceRule | undefined)?.frequency) ?? 'none';
+    return freq !== 'none';
+  }
+
+  function hasRecurrenceAffectingChanges(prev: TaskTemplate, next: Omit<TaskTemplate, 'id'> | TaskTemplate): boolean {
+    const n = next as TaskTemplate;
+    if (prev.schedulingType !== n.schedulingType) return true;
+    if ((prev.durationMinutes || 0) !== (n.durationMinutes || 0)) return true;
+    if (n.schedulingType === 'fixed') {
+      if ((prev.defaultTime || '') !== (n.defaultTime || '')) return true;
+    } else {
+      if ((prev.timeWindow || 'anytime') !== (n.timeWindow || 'anytime')) return true;
+    }
+    const prevRule = (prev.recurrenceRule ?? null);
+    const nextRule = (n.recurrenceRule ?? null);
+    try {
+      if (JSON.stringify(prevRule) !== JSON.stringify(nextRule)) return true;
+    } catch {}
+    return false;
+  }
 
   useEffect(() => {
     (async () => {
@@ -54,10 +89,10 @@ export default function LibraryPage() {
     upsert({ ...t, isActive: newVal });
     try {
       await updateTemplate(user.uid, t.id, { isActive: newVal });
-      toast.success(newVal ? "Enabled" : "Disabled");
+      toastSuccess(newVal ? 'enable' : 'disable');
     } catch {
       upsert({ ...t });
-      toast.error("Failed to update");
+      toastError(newVal ? 'enable' : 'disable');
     }
   }
 
@@ -66,9 +101,9 @@ export default function LibraryPage() {
     try {
       const created = await duplicateTemplate(user.uid, t);
       upsert(created);
-      toast.success("Duplicated");
+      toastSuccess('duplicate');
     } catch {
-      toast.error("Failed to duplicate");
+      toastError('duplicate');
     }
   }
 
@@ -79,10 +114,10 @@ export default function LibraryPage() {
     upsert({ ...t, isActive: false });
     try {
       await softDeleteTemplate(user.uid, id);
-      toast.success("Deleted (soft)");
+      toastSuccess('delete');
     } catch {
       upsert({ ...t });
-      toast.error("Failed to delete");
+      toastError('delete');
     }
   }
 
@@ -90,22 +125,114 @@ export default function LibraryPage() {
     if (!user) return;
     if ('id' in payload) {
       // edit
-      upsert(payload);
+      const prev = templates.find(x => x.id === payload.id) || null;
+      const needsScope = isRecurringTemplate(prev) && hasRecurrenceAffectingChanges(prev as TaskTemplate, payload);
+      if (needsScope && prev) {
+        // Defer the actual save until user selects a scope
+        setPendingEdit({ prev, next: payload as TaskTemplate });
+        setScopeOpen(true);
+        setModalOpen(false);
+        return;
+      }
+
+      // No scope prompt needed — proceed with ALL update
+      upsert(payload as TaskTemplate);
       try {
         await updateTemplate(user.uid, payload.id, payload);
-        toast.success("Saved");
+        toastSuccess('save');
       } catch {
-        toast.error("Failed to save");
+        toastError('save');
       }
     } else {
       // create
       try {
         const created = await createTemplate(user.uid, payload);
         upsert(created);
-        toast.success("Created");
+        toastSuccess('create');
       } catch {
-        toast.error("Failed to create");
+        toastError('create');
       }
+    }
+  }
+
+  async function handleScopeSelect(scope: EditScope, options?: { status?: 'pending'|'completed'|'skipped'|'postponed' }) {
+    if (!user || !pendingEdit) return;
+    const { prev, next } = pendingEdit;
+    setPendingEdit(null);
+    setScopeOpen(false);
+
+    if (scope === 'all') {
+      // Apply update to entire series
+      upsert(next);
+      try {
+        await updateTemplate(user.uid, next.id, next);
+        toastSuccess('save');
+      } catch {
+        toastError('save');
+      }
+      return;
+    }
+
+    if (scope === 'only') {
+      // Limit initial support to start-time overrides
+      if (next.schedulingType === 'fixed' && next.defaultTime) {
+        const ok = await setInstanceStartTime(currentDate, next.id, next.defaultTime);
+        toastResult('update', ok);
+      } else {
+        // Not supported yet – no-op with guidance
+        toast.error('Only-this edits currently support time changes only');
+      }
+      // Apply optional status override
+      if (options?.status) {
+        let ok = true;
+        if (options.status === 'completed') ok = await toggleComplete(currentDate, next.id);
+        else if (options.status === 'skipped') ok = await skipInstance(currentDate, next.id);
+        else if (options.status === 'postponed') ok = await postponeInstance(currentDate, next.id);
+        else if (options.status === 'pending') ok = await undoInstanceStatus(currentDate, next.id);
+        if (options.status === 'completed') toastResult('complete', ok);
+        else if (options.status === 'skipped') toastResult('skip', ok);
+        else if (options.status === 'postponed') toastResult('postpone', ok);
+        else toastResult('pending', ok);
+      }
+      return;
+    }
+
+    if (scope === 'future') {
+      // Split series: end old at day before target; create new from target with updates
+      try {
+        const target = new Date(currentDate);
+        const prevDay = new Date(target);
+        prevDay.setDate(target.getDate() - 1);
+        const prevEnd = formatDate(prevDay);
+
+        const basePrevRule = ((prev.recurrenceRule ?? {}) as RecurrenceRule);
+        const updatedPrevRule: RecurrenceRule = { ...basePrevRule, endDate: prevEnd };
+        await updateTemplate(user.uid, prev.id, { recurrenceRule: updatedPrevRule });
+        upsert({ ...prev, recurrenceRule: updatedPrevRule });
+
+        const baseNextRule = ((next.recurrenceRule ?? basePrevRule) as RecurrenceRule);
+        const updatedNextRule: RecurrenceRule = { ...baseNextRule, startDate: currentDate, endDate: undefined };
+        const newPayload: Omit<TaskTemplate, 'id'> = {
+          taskName: next.taskName,
+          description: next.description,
+          isMandatory: next.isMandatory,
+          priority: next.priority,
+          isActive: next.isActive,
+          schedulingType: next.schedulingType,
+          defaultTime: next.defaultTime,
+          timeWindow: next.timeWindow,
+          durationMinutes: next.durationMinutes,
+          minDurationMinutes: next.minDurationMinutes,
+          dependsOn: next.dependsOn,
+          recurrenceRule: updatedNextRule,
+        };
+        const created = await createTemplate(user.uid, newPayload);
+        upsert(created);
+        toastSuccess('save');
+      } catch {
+        toastError('save');
+      }
+      return;
     }
   }
 
@@ -185,6 +312,14 @@ export default function LibraryPage() {
         onOpenChange={setModalOpen}
         initial={editItem}
         onSave={onSaveModal}
+      />
+      {/* Scope dialog for recurring edits */}
+      <ScopeDialog
+        open={scopeOpen}
+        onOpenChange={setScopeOpen}
+        onSelect={handleScopeSelect}
+        templateName={pendingEdit?.next.taskName}
+        targetDate={currentDate}
       />
     </div>
   );

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/FirebaseClientProvider";
 import { toast } from "sonner";
+import { toastSuccess } from "@/lib/ui/toast";
 
 export default function LoginPage() {
   const { signIn, signUp, loading } = useAuth();
@@ -18,11 +19,10 @@ export default function LoginPage() {
     try {
       if (mode === "signup") {
         await signUp(email.trim(), password);
-        toast.success("Account created and signed in");
       } else {
         await signIn(email.trim(), password);
-        toast.success("Signed in");
       }
+      toastSuccess('signin');
       router.push("/today");
     } catch (err: unknown) {
       let msg = "Sign-in failed";
