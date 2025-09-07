@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useAppStore } from './useAppStore';
+import type { AuthUser } from "@/lib/firebase/client";
 
 function resetStore() {
   const s = useAppStore.getState();
@@ -13,8 +14,8 @@ describe('useAppStore - core actions', () => {
 
   it('sets user and resets state on sign-out', () => {
     const s = useAppStore.getState();
-    s.setUser({ uid: 'u1' } as any);
-    expect(useAppStore.getState().user && (useAppStore.getState().user as any).uid).toBe('u1');
+    s.setUser({ uid: 'u1' } as unknown as AuthUser);
+    expect(useAppStore.getState().user && (useAppStore.getState().user as AuthUser).uid).toBe('u1');
 
     s.resetAfterSignOut();
     const after = useAppStore.getState();
@@ -62,4 +63,3 @@ describe('useAppStore - core actions', () => {
     expect(afterUndo.length).toBe(0);
   });
 });
-

@@ -94,8 +94,8 @@ export const useAppStore = create<AppState>()(
       },
 
       async preloadCachedSchedule(date) {
-        const u = get().user as any;
-        if (!u || !u.uid) return;
+        const u = get().user;
+        if (!u) return;
         try {
           const cached = await getCachedSchedule(u.uid, date);
           if (cached) set((s) => { s.scheduleCacheByDate[date] = cached; });
@@ -124,8 +124,8 @@ export const useAppStore = create<AppState>()(
 
       async loadInstancesForDate(date) {
         const s = get();
-        const u = s.user as any;
-        if (!u || !u.uid) return;
+        const u = s.user;
+        if (!u) return;
         try {
           const items = await listInstancesByDate(u.uid, date);
           set((st) => { st.instancesByDate[date] = items; });
@@ -170,8 +170,8 @@ export const useAppStore = create<AppState>()(
           }
         });
 
-        const u = get().user as any;
-        if (!u || !u.uid) return true; // No persistence when signed out
+        const u = get().user;
+        if (!u) return true; // No persistence when signed out
         try {
           if (action === 'complete' && writePayload) {
             await upsertInstance(u.uid, writePayload);
@@ -216,8 +216,8 @@ export const useAppStore = create<AppState>()(
         const result = generateSchedule({ settings, templates, instances, date });
         set((st) => { st.scheduleCacheByDate[date] = result; });
         // Best-effort: write cache to Firestore
-        const u = s.user as any;
-        if (u && u.uid && result.success) {
+        const u = s.user;
+        if (u && result.success) {
           // Fire and forget
           void putCachedSchedule(u.uid, date, result).catch((e) => console.warn('Failed to cache schedule', e));
         }

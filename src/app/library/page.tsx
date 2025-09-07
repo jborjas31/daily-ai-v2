@@ -34,6 +34,9 @@ export default function LibraryPage() {
     })();
   }, [ready, user, setTaskTemplates]);
 
+  const active = useMemo(() => templates.filter(t => t.isActive !== false), [templates]);
+  const inactive = useMemo(() => templates.filter(t => t.isActive === false), [templates]);
+
   if (!ready) {
     return (
       <div className="mx-auto max-w-6xl p-4">
@@ -44,9 +47,6 @@ export default function LibraryPage() {
       </div>
     );
   }
-
-  const active = useMemo(() => templates.filter(t => t.isActive !== false), [templates]);
-  const inactive = useMemo(() => templates.filter(t => t.isActive === false), [templates]);
 
   async function toggleActive(t: TaskTemplate) {
     if (!user) return;

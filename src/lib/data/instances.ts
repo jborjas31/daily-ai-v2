@@ -34,7 +34,7 @@ export async function upsertInstance(
 ): Promise<string> {
   // Use deterministic id if not provided so toggles are idempotent per date/template
   const id = (inst as TaskInstance).id ?? instanceIdFor(inst.date, inst.templateId);
-  const { id: _drop, ...payload } = inst as TaskInstance;
+  const { id: _ignored, ...payload } = inst as TaskInstance;
   await setDoc(ref(uid, id), payload, { merge: true });
   return id;
 }
@@ -42,4 +42,3 @@ export async function upsertInstance(
 export async function deleteInstance(uid: string, id: string): Promise<void> {
   await deleteDoc(ref(uid, id));
 }
-
