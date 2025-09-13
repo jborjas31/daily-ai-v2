@@ -104,21 +104,20 @@ export default function LibraryPage() {
   const inactive = useMemo(() => filteredSorted.filter(t => t.isActive === false), [filteredSorted]);
   const byId = useMemo(() => buildById(templates), [templates]);
 
-  function updatedAtMillis(v: unknown): number {
-    if (!v) return 0;
-    if (typeof v === 'number') return v;
-    try {
-      // Firestore Timestamp
-      const f: any = v as any;
-      if (typeof f.toMillis === 'function') return f.toMillis();
-      if (typeof f.seconds === 'number') return f.seconds * 1000 + Math.floor((f.nanoseconds || 0) / 1e6);
-    } catch {}
-    return 0;
-  }
-
   const recent = useMemo(() => {
+    type TimestampLike = { toMillis?: () => number; seconds?: number; nanoseconds?: number };
+    const toMillis = (v: unknown): number => {
+      if (!v) return 0;
+      if (typeof v === 'number') return v;
+      try {
+        const f = v as TimestampLike; // Firestore Timestamp-like
+        if (typeof f.toMillis === 'function') return f.toMillis();
+        if (typeof f.seconds === 'number') return f.seconds * 1000 + Math.floor((f.nanoseconds || 0) / 1e6);
+      } catch {}
+      return 0;
+    };
     const withTs = templates
-      .map((t) => ({ t, ms: updatedAtMillis((t as any).updatedAt) }))
+      .map((t) => ({ t, ms: toMillis(t.updatedAt) }))
       .filter((x) => x.ms > 0);
     withTs.sort((a, b) => b.ms - a.ms);
     return withTs.slice(0, 5).map((x) => x.t);

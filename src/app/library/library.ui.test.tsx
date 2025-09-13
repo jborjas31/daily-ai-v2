@@ -24,7 +24,7 @@ vi.mock('@/lib/data/templates', () => ({
   updateTemplate: vi.fn(async () => {}),
   duplicateTemplate: vi.fn(async () => ({})),
   softDeleteTemplate: vi.fn(async () => {}),
-  createTemplate: vi.fn(async (_uid: string, payload: Omit<TaskTemplate, 'id'>) => ({ ...(payload as any), id: 'new' })),
+  createTemplate: vi.fn(async (_uid: string, payload: Omit<TaskTemplate, 'id'>) => ({ ...payload, id: 'new' } as TaskTemplate)),
 }));
 
 // Mock heavy UI/portal dependencies to keep JSDOM stable
@@ -37,15 +37,15 @@ vi.mock('sonner', () => ({
 }));
 vi.mock('@/components/ui/ConfirmDialog', () => ({
   __esModule: true,
-  default: (props: any) => (props.open ? <div data-testid="confirm-dialog" /> : null),
+  default: (props: { open: boolean }) => (props.open ? <div data-testid="confirm-dialog" /> : null),
 }));
 vi.mock('@/components/ui/ScopeDialog', () => ({
   __esModule: true,
-  default: (props: any) => (props.open ? <div data-testid="scope-dialog" /> : null),
+  default: (props: { open: boolean }) => (props.open ? <div data-testid="scope-dialog" /> : null),
 }));
 vi.mock('@/components/library/TaskModal', () => ({
   __esModule: true,
-  default: (props: any) => (props.open ? <div data-testid="task-modal" /> : null),
+  default: (props: { open: boolean }) => (props.open ? <div data-testid="task-modal" /> : null),
 }));
 
 import LibraryPage from './page';
@@ -99,8 +99,9 @@ describe('Library UI - search, filters, sort, badges', () => {
 
     // Wait for page to render
     await screen.findByRole('heading', { name: 'Library' });
-    // Wait for sections to render
     const activeSection = await findActiveSection();
+    // Wait for sections to render
+    await findActiveSection();
 
     // Type into search
     const searchInput = screen.getByLabelText('Search');
@@ -149,7 +150,6 @@ describe('Library UI - search, filters, sort, badges', () => {
     render(<LibraryPage />);
     const user = userEvent.setup();
     await screen.findByRole('heading', { name: 'Library' });
-    const activeSection = await findActiveSection();
 
     await user.click(screen.getByRole('button', { name: 'Priority High→Low' }));
     const updatedActive = await findActiveSection();
