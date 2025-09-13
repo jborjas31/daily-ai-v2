@@ -36,9 +36,10 @@ Status: In Progress
 Acceptance: Available as named exports from `@/lib/time`.
 
 1.2 Add `src/lib/utils/useNowTick.ts`:
-- `useNowTick(periodMs = 30000)` — returns `{ nowISO, nowTime }` and updates on an interval.
-- Pause updates when `document.hidden` is true; resume on visibility change.
-- Cleanup on unmount.
+Status: Completed
+- Implemented `useNowTick(periodMs = 30000)` returning `{ nowISO, nowTime }`.
+- Skips updates when `document.hidden === true`; forces an immediate refresh on visibility change.
+- Cleans up interval and event listener on unmount.
 
 1.3 Unit tests:
 - `src/lib/time/index.test.ts` — toMinutes/fromMinutes round‑trip; isToday logic (mock Date).
