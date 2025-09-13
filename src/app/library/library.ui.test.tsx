@@ -99,7 +99,6 @@ describe('Library UI - search, filters, sort, badges', () => {
 
     // Wait for page to render
     await screen.findByRole('heading', { name: 'Library' });
-    const activeSection = await findActiveSection();
     // Wait for sections to render
     await findActiveSection();
 

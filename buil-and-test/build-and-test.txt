@@ -1,25 +1,7 @@
 Run npm run lint
-
+  
 > daily_ai_v2@0.1.0 lint
 > eslint
-
-
 /home/runner/work/daily-ai-v2/daily-ai-v2/src/app/library/library.ui.test.tsx
-Error:    27:102  error    Unexpected any. Specify a different type            @typescript-eslint/no-explicit-any
-Error:    40:20   error    Unexpected any. Specify a different type            @typescript-eslint/no-explicit-any
-Error:    44:20   error    Unexpected any. Specify a different type            @typescript-eslint/no-explicit-any
-Error:    48:20   error    Unexpected any. Specify a different type            @typescript-eslint/no-explicit-any
-Warning:   103:11   warning  'activeSection' is assigned a value but never used  @typescript-eslint/no-unused-vars
-Warning:   152:11   warning  'activeSection' is assigned a value but never used  @typescript-eslint/no-unused-vars
-
-/home/runner/work/daily-ai-v2/daily-ai-v2/src/app/library/page.tsx
-Error:   112:16  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
-Error:   112:27  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
-Error:   121:51  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
-
-/home/runner/work/daily-ai-v2/daily-ai-v2/src/lib/data/instances.ts
-Warning:   37:15  warning  '_ignored' is assigned a value but never used  @typescript-eslint/no-unused-vars
-
-✖ 10 problems (7 errors, 3 warnings)
-
-Error: Process completed with exit code 1.
+Warning:   102:11  warning  'activeSection' is assigned a value but never used  @typescript-eslint/no-unused-vars
+✖ 1 problem (0 errors, 1 warning)
