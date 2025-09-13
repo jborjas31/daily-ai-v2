@@ -9,7 +9,8 @@ import TaskModal from "@/components/library/TaskModal";
 import { createTemplate } from "@/lib/data/templates";
 import { toast } from "sonner";
 import { toastError, toastSuccess } from "@/lib/ui/toast";
-import { toMinutes } from "@/lib/time";
+import { toMinutes, todayISO } from "@/lib/time";
+import useNowTick from "@/lib/utils/useNowTick";
 
 function useNowMinutes() {
   const [mins, setMins] = useState(() => {
@@ -29,6 +30,7 @@ function useNowMinutes() {
 export default function TodayPage() {
   const { user, ready } = useRequireAuth();
   const currentDate = useAppStore((s: AppState) => s.ui.currentDate);
+  const setCurrentDate = useAppStore((s: AppState) => s.setCurrentDate);
   const schedule = useAppStore((s: AppState) => s.generateScheduleForDate(s.ui.currentDate));
   const instances = useAppStore((s: AppState) => s.getTaskInstancesForDate(s.ui.currentDate));
   const loadInstancesForDate = useAppStore((s: AppState) => s.loadInstancesForDate);
@@ -38,6 +40,16 @@ export default function TodayPage() {
   const setNewTaskPrefill = useAppStore((s: AppState) => s.setNewTaskPrefill);
   const [modalOpen, setModalOpen] = useState(false);
   const nowMins = useNowMinutes();
+  const { nowTime } = useNowTick(30_000);
+
+  function addDaysISO(dateISO: string, delta: number): string {
+    const d = new Date(dateISO + 'T00:00:00');
+    d.setDate(d.getDate() + delta);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
 
   const isToday = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -78,8 +90,52 @@ export default function TodayPage() {
 
   return (
     <div className="mx-auto max-w-6xl p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h1 className="text-xl font-semibold">Today</h1>
+      <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold">Today</h1>
+          <span className="text-sm text-black/70 dark:text-white/70" aria-label="Current time">{nowTime}</span>
+        </div>
+        <div className="flex items-end gap-2">
+          <div className="flex items-center gap-2" role="group" aria-label="Date navigation">
+            <button
+              type="button"
+              onClick={() => setCurrentDate(addDaysISO(currentDate, -1))}
+              className="px-3 py-1.5 rounded-md bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-sm"
+              title="Previous day"
+              aria-label="Previous day"
+            >
+              ◀ Prev
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentDate(todayISO())}
+              className="px-3 py-1.5 rounded-md bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-sm"
+              title="Jump to today"
+              aria-label="Jump to today"
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentDate(addDaysISO(currentDate, 1))}
+              className="px-3 py-1.5 rounded-md bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-sm"
+              title="Next day"
+              aria-label="Next day"
+            >
+              Next ▶
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <label htmlFor="dateInput" className="text-sm">Date</label>
+            <input
+              id="dateInput"
+              type="date"
+              value={currentDate}
+              onChange={(e) => setCurrentDate(e.target.value)}
+              className="px-2 py-1.5 border rounded-md text-sm"
+            />
+          </div>
+        </div>
         <button
           type="button"
           onClick={() => setModalOpen(true)}

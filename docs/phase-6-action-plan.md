@@ -25,7 +25,7 @@ Acceptance for Preconditions: Verified — Today renders, store date can be set 
 
 ## 1) Time Utilities + Ticker Hook
 
-Status: In Progress
+Status: Completed
 
 1.1 Time helpers implemented in `src/lib/time.ts` (existing module):
 - `todayISO()` — returns YYYY-MM-DD for local time.
@@ -53,10 +53,11 @@ Acceptance: Callers can subscribe to a lightweight tick without forcing store re
 Status: Pending
 
 2.1 Update `src/components/AppHeader/*` (or Today page header) to show:
-- Current date label + live clock (HH:MM). Use `useNowTick(30000)`.
-- Buttons: Prev Day, Today, Next Day (keyboard accessible, labeled).
-- Native date input: type="date"; value bound to `ui.currentDate`; updates via `setCurrentDate(...)`.
-- Mobile swipe left/right on Today to change date (use pointer/touch events or a lightweight library; scope small and cancellable).
+Status: Completed (UI + wiring)
+- Current date label + live clock (HH:MM) via `useNowTick(30000)`.
+- Buttons: Prev Day, Today, Next Day with accessible labels/titles.
+- Native date input bound to `ui.currentDate`, updates store via `setCurrentDate(...)`.
+- Implemented within `src/app/today/page.tsx` header; mobile swipe reserved for a follow‑up.
 
 2.2 Wire to store:
 - Prev: `currentDate -> date - 1 day`.
