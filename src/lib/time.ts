@@ -25,3 +25,23 @@ export function addMinutes(t: TimeString, delta: number): TimeString {
 export function compareTime(a: TimeString, b: TimeString): number {
   return toMinutes(a) - toMinutes(b);
 }
+
+// Phase 6 helpers (local time aware)
+export function todayISO(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export function isToday(dateISO: string): boolean {
+  return dateISO === todayISO();
+}
+
+export function nowTimeString(): TimeString {
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}` as TimeString;
+}

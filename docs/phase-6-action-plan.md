@@ -4,25 +4,36 @@ Scope: Add real‑time UX to Today (live clock/now‑line with ~30s cadence), ro
 
 ## 0) Preconditions
 
-Status: Pending (verify)
+Status: Completed
 
-- Today route exists with Timeline and List views.
-- Store exposes `ui.currentDate` and actions `setCurrentDate(date)`.
-- Scheduling engine available with `generateScheduleForDate(date)` selector.
-- Instance mutation actions in store: `setInstanceStartTime`, `skipInstance`, `postponeInstance`, `undoInstanceStatus`.
-- Tests running with jsdom and user-event; fake timers available via Vitest.
+- Today route with Timeline and List views.
+  - Evidence:
+    - `src/app/today/page.tsx` renders `<Timeline />` and `<TaskList />`.
+    - `src/components/today/Timeline.tsx` and `src/components/today/TaskList.tsx` are implemented and used.
+- Store exposes `ui.currentDate` and `setCurrentDate(date)`.
+  - Evidence: `src/store/useAppStore.ts` defines `ui.currentDate` and action `setCurrentDate(date)`.
+- Scheduling engine selector available: `generateScheduleForDate(date)`.
+  - Evidence: `src/store/useAppStore.ts` implements `generateScheduleForDate` and it’s used by Today components.
+- Instance mutation actions ready: `setInstanceStartTime`, `skipInstance`, `postponeInstance`, `undoInstanceStatus`.
+  - Evidence: All actions are implemented in `src/store/useAppStore.ts` and exercised in UI (`TaskList`) and tests.
+- Tests configured for jsdom + user-event; fake timers available via Vitest.
+  - Evidence:
+    - `vitest.config.ts` uses jsdom for `*.test.tsx` via `environmentMatchGlobs`.
+    - Tests present and passing: `src/components/today/TaskList.ui.test.tsx`, `src/store/useAppStore.test.ts`.
 
-Acceptance for Preconditions: We can render Today, set the current date via store, and compute a schedule for that date in tests.
+Acceptance for Preconditions: Verified — Today renders, store date can be set in tests, and schedule computation runs via `generateScheduleForDate`.
 
 ## 1) Time Utilities + Ticker Hook
 
-Status: Pending
+Status: In Progress
 
-1.1 Add `src/lib/time/index.ts`:
-- `todayISO()` — return YYYY-MM-DD for local time.
-- `isToday(dateISO: string): boolean`.
-- `nowTimeString()` — current local time as `HH:MM` (zero-padded).
-- `toMinutes('HH:MM')` / `fromMinutes(n)` — helpers for placement math.
+1.1 Time helpers implemented in `src/lib/time.ts` (existing module):
+- `todayISO()` — returns YYYY-MM-DD for local time.
+- `isToday(dateISO: string)` — compares against local `todayISO()`.
+- `nowTimeString()` — current local time as `HH:MM`.
+- `toMinutes('HH:MM')` / `fromMinutes(n)` — already present and used by scheduling/timeline.
+
+Acceptance: Available as named exports from `@/lib/time`.
 
 1.2 Add `src/lib/utils/useNowTick.ts`:
 - `useNowTick(periodMs = 30000)` — returns `{ nowISO, nowTime }` and updates on an interval.
