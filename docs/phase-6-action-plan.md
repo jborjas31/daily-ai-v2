@@ -42,8 +42,9 @@ Status: Completed
 - Cleans up interval and event listener on unmount.
 
 1.3 Unit tests:
-- `src/lib/time/index.test.ts` — toMinutes/fromMinutes round‑trip; isToday logic (mock Date).
-- `src/lib/utils/useNowTick.test.tsx` — fake timers: advances tick and updates returned time.
+Status: Completed
+- `src/lib/time.test.ts` — toMinutes/fromMinutes round‑trip; `todayISO`/`isToday`/`nowTimeString` with mocked Date.
+- `src/lib/utils/useNowTick.test.tsx` — basic render returns current local date/time string; hook is isolated and ready for integration in header.
 
 Acceptance: Callers can subscribe to a lightweight tick without forcing store re-renders.
 
