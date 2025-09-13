@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Timeline from "@/components/today/Timeline";
 import TaskList from "@/components/today/TaskList";
 import useRequireAuth from "@/components/guards/useRequireAuth";
@@ -9,16 +9,57 @@ import TaskModal from "@/components/library/TaskModal";
 import { createTemplate } from "@/lib/data/templates";
 import { toast } from "sonner";
 import { toastError, toastSuccess } from "@/lib/ui/toast";
+import { toMinutes } from "@/lib/time";
+
+function useNowMinutes() {
+  const [mins, setMins] = useState(() => {
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes();
+  });
+  useEffect(() => {
+    const id = setInterval(() => {
+      const d = new Date();
+      setMins(d.getHours() * 60 + d.getMinutes());
+    }, 30_000);
+    return () => clearInterval(id);
+  }, []);
+  return mins;
+}
 
 export default function TodayPage() {
   const { user, ready } = useRequireAuth();
   const currentDate = useAppStore((s: AppState) => s.ui.currentDate);
+  const schedule = useAppStore((s: AppState) => s.generateScheduleForDate(s.ui.currentDate));
+  const instances = useAppStore((s: AppState) => s.getTaskInstancesForDate(s.ui.currentDate));
   const loadInstancesForDate = useAppStore((s: AppState) => s.loadInstancesForDate);
   const preloadCachedSchedule = useAppStore((s: AppState) => s.preloadCachedSchedule);
   const upsert = useAppStore((s: AppState) => s.upsertTaskTemplate);
   const prefill = useAppStore((s: AppState) => s.ui.newTaskPrefill);
   const setNewTaskPrefill = useAppStore((s: AppState) => s.setNewTaskPrefill);
   const [modalOpen, setModalOpen] = useState(false);
+  const nowMins = useNowMinutes();
+
+  const isToday = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return currentDate === today;
+  }, [currentDate]);
+
+  const { completedCount, skippedCount, overdueCount } = useMemo(() => {
+    const completedCount = instances.filter(i => i.status === 'completed').length;
+    const skippedCount = instances.filter(i => i.status === 'skipped').length;
+    // Overdue: scheduled start before now and not completed/skipped
+    let overdueCount = 0;
+    if (isToday) {
+      const instMap = new Map(instances.map(i => [i.templateId, i]));
+      for (const b of schedule.schedule) {
+        const start = toMinutes(b.startTime);
+        const inst = instMap.get(b.templateId);
+        const done = !!inst && (inst.status === 'completed' || inst.status === 'skipped');
+        if (!done && start < nowMins) overdueCount++;
+      }
+    }
+    return { completedCount, skippedCount, overdueCount };
+  }, [instances, schedule.schedule, nowMins, isToday]);
 
   useEffect(() => {
     if (!ready || !user) return;
@@ -46,6 +87,18 @@ export default function TodayPage() {
         >
           New Task
         </button>
+      </div>
+      {/* Status rollup (counts only) */}
+      <div className="mb-3 flex flex-wrap gap-2 text-sm">
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-200 text-emerald-900 dark:bg-emerald-800 dark:text-emerald-100" title="Completed today">
+          Completed: {completedCount}
+        </span>
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-200 text-amber-900 dark:bg-amber-800 dark:text-amber-100" title="Skipped today">
+          Skipped: {skippedCount}
+        </span>
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-rose-200 text-rose-900 dark:bg-rose-800 dark:text-rose-100" title="Overdue (scheduled before now and not done)">
+          Overdue: {overdueCount}
+        </span>
       </div>
       <Timeline />
       <TaskList />

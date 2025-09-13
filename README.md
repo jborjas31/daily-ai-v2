@@ -54,7 +54,19 @@ Open http://localhost:3000 and navigate to `/today`.
     - Only this: per‑date override (supports time change; optional status override)
     - This and future: splits the series at the selected date (old gets endDate; new copy starts at target date)
     - All: apply to the entire series
-  - Scope dialog: `src/components/ui/ScopeDialog.tsx`
+- Scope dialog: `src/components/ui/ScopeDialog.tsx`
+
+## Library Search & Filters
+
+- Search: debounced (~250ms) search across task name and description.
+- Filters: combine Mandatory (All/Mandatory/Skippable) and Time window chips (Morning/Afternoon/Evening/Anytime).
+  - Fixed‑time tasks are not excluded by Time window filters by design.
+- Sort: toggle between Name A–Z and Priority High→Low.
+- Reset: one click to clear all filters and restore the full list.
+- Dependency badges: show prerequisite status (available, missing, disabled, cycle) when a template depends on another.
+- Recently Modified: optional top‑5 rollup based on `updatedAt` metadata.
+
+See Phase 5 plan for details: `docs/phase-5-action-plan.md`.
 
 ## Tech Stack
 

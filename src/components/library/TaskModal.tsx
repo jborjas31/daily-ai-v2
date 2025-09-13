@@ -1,6 +1,6 @@
 "use client";
 import * as Dialog from "@radix-ui/react-dialog";
-import { useEffect, useId, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import type { TaskTemplate, TimeWindow, TimeString } from "@/lib/types";
 import { useAppStore } from "@/store/useAppStore";
 import { validateForm, shouldDisableSubmit } from "./taskModalValidation";

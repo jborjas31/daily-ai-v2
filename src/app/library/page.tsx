@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useId } from "react";
 import useRequireAuth from "@/components/guards/useRequireAuth";
 import { useAppStore } from "@/store/useAppStore";
 import type { AppState } from "@/store/useAppStore";
@@ -12,6 +12,9 @@ import ScopeDialog, { type EditScope } from "@/components/ui/ScopeDialog";
 import TaskModal from "@/components/library/TaskModal";
 import { toast, } from "sonner";
 import { toastError, toastSuccess, toastResult } from "@/lib/ui/toast";
+import useDebouncedValue from "@/lib/utils/useDebouncedValue";
+import { filterTemplates, sortTemplates } from "@/lib/templates/filtering";
+import { buildById, getDependencyStatus } from "@/lib/templates/dependencies";
 
 export default function LibraryPage() {
   const { user, ready } = useRequireAuth();
@@ -19,6 +22,15 @@ export default function LibraryPage() {
   const setTaskTemplates = useAppStore((s: AppState) => s.setTaskTemplates);
   const upsert = useAppStore((s: AppState) => s.upsertTaskTemplate);
   const currentDate = useAppStore((s: AppState) => s.ui.currentDate);
+  const search = useAppStore((s: AppState) => s.filters.search);
+  const setFilterSearch = useAppStore((s: AppState) => s.setFilterSearch);
+  const sortMode = useAppStore((s: AppState) => s.filters.sortMode);
+  const setFilterSortMode = useAppStore((s: AppState) => s.setFilterSortMode);
+  const mandatory = useAppStore((s: AppState) => s.filters.mandatory);
+  const setFilterMandatory = useAppStore((s: AppState) => s.setFilterMandatory);
+  const timeWindows = useAppStore((s: AppState) => s.filters.timeWindows);
+  const toggleFilterTimeWindow = useAppStore((s: AppState) => s.toggleFilterTimeWindow);
+  const resetFilters = useAppStore((s: AppState) => s.resetFilters);
   const setInstanceStartTime = useAppStore((s: AppState) => s.setInstanceStartTime);
   const toggleComplete = useAppStore((s: AppState) => s.toggleComplete);
   const skipInstance = useAppStore((s: AppState) => s.skipInstance);
@@ -30,6 +42,16 @@ export default function LibraryPage() {
   const [editItem, setEditItem] = useState<TaskTemplate | null>(null);
   const [scopeOpen, setScopeOpen] = useState(false);
   const [pendingEdit, setPendingEdit] = useState<{ prev: TaskTemplate; next: TaskTemplate } | null>(null);
+  const [searchDraft, setSearchDraft] = useState<string>(search ?? "");
+  const debouncedSearch = useDebouncedValue(searchDraft, 250);
+  // A11y label ids for control groups
+  const sortLabelId = useId();
+  const mandatoryLabelId = useId();
+  const timeWindowLabelId = useId();
+
+  useEffect(() => {
+    setFilterSearch(debouncedSearch);
+  }, [debouncedSearch, setFilterSearch]);
 
   function isRecurringTemplate(t: TaskTemplate | null | undefined): boolean {
     if (!t) return false;
@@ -69,8 +91,38 @@ export default function LibraryPage() {
     })();
   }, [ready, user, setTaskTemplates]);
 
-  const active = useMemo(() => templates.filter(t => t.isActive !== false), [templates]);
-  const inactive = useMemo(() => templates.filter(t => t.isActive === false), [templates]);
+  const filteredSorted = useMemo(() => {
+    const filtered = filterTemplates(templates, {
+      query: search,
+      mandatory,
+      timeWindows,
+    });
+    return sortTemplates(filtered, sortMode);
+  }, [templates, search, mandatory, timeWindows, sortMode]);
+
+  const active = useMemo(() => filteredSorted.filter(t => t.isActive !== false), [filteredSorted]);
+  const inactive = useMemo(() => filteredSorted.filter(t => t.isActive === false), [filteredSorted]);
+  const byId = useMemo(() => buildById(templates), [templates]);
+
+  function updatedAtMillis(v: unknown): number {
+    if (!v) return 0;
+    if (typeof v === 'number') return v;
+    try {
+      // Firestore Timestamp
+      const f: any = v as any;
+      if (typeof f.toMillis === 'function') return f.toMillis();
+      if (typeof f.seconds === 'number') return f.seconds * 1000 + Math.floor((f.nanoseconds || 0) / 1e6);
+    } catch {}
+    return 0;
+  }
+
+  const recent = useMemo(() => {
+    const withTs = templates
+      .map((t) => ({ t, ms: updatedAtMillis((t as any).updatedAt) }))
+      .filter((x) => x.ms > 0);
+    withTs.sort((a, b) => b.ms - a.ms);
+    return withTs.slice(0, 5).map((x) => x.t);
+  }, [templates]);
 
   if (!ready) {
     return (
@@ -248,9 +300,141 @@ export default function LibraryPage() {
           New Task
         </button>
       </div>
+      {/* Toolbar: Search (debounced) + Sort toggle + Mandatory filter + Time window chips + Reset */}
+      <div className="mb-4 flex items-end gap-4 flex-wrap">
+        <div className="flex-1 min-w-0">
+          <label htmlFor="librarySearch" className="block text-sm mb-1">Search</label>
+          <div className="flex items-center gap-2">
+            <input
+              id="librarySearch"
+              type="text"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              placeholder="Search by name or description..."
+              className="w-full border rounded-md px-2 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            />
+            {searchDraft ? (
+              <button
+                type="button"
+                onClick={() => { setSearchDraft(""); setFilterSearch(""); }}
+                className="px-2 py-1 rounded-md bg-slate-200 dark:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+                aria-label="Clear search"
+                title="Clear search"
+              >
+                ✕
+              </button>
+            ) : null}
+          </div>
+        </div>
+        <div>
+          <span id={sortLabelId} className="block text-sm mb-1">Sort</span>
+          <div role="group" aria-labelledby={sortLabelId} className="inline-flex rounded-md overflow-hidden border border-black/10 dark:border-white/10">
+            <button
+              type="button"
+              onClick={() => setFilterSortMode('name')}
+              aria-pressed={sortMode === 'name'}
+              className={`px-3 py-1.5 text-sm ${sortMode === 'name' ? 'bg-blue-600 text-white' : 'bg-slate-200 dark:bg-slate-700'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2`}
+              title="Sort by name (A–Z)"
+            >
+              Name A–Z
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterSortMode('priority')}
+              aria-pressed={sortMode === 'priority'}
+              className={`px-3 py-1.5 text-sm border-l border-black/10 dark:border-white/10 ${sortMode === 'priority' ? 'bg-blue-600 text-white' : 'bg-slate-200 dark:bg-slate-700'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2`}
+              title="Sort by priority (High→Low)"
+            >
+              Priority High→Low
+            </button>
+          </div>
+        </div>
+        <div>
+          <span id={mandatoryLabelId} className="block text-sm mb-1">Mandatory</span>
+          <div role="group" aria-labelledby={mandatoryLabelId} className="inline-flex rounded-md overflow-hidden border border-black/10 dark:border-white/10">
+            <button
+              type="button"
+              onClick={() => setFilterMandatory('all')}
+              aria-pressed={mandatory === 'all'}
+              className={`px-3 py-1.5 text-sm ${mandatory === 'all' ? 'bg-blue-600 text-white' : 'bg-slate-200 dark:bg-slate-700'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2`}
+              title="Show all tasks"
+            >
+              All
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterMandatory('mandatory')}
+              aria-pressed={mandatory === 'mandatory'}
+              className={`px-3 py-1.5 text-sm border-l border-black/10 dark:border-white/10 ${mandatory === 'mandatory' ? 'bg-blue-600 text-white' : 'bg-slate-200 dark:bg-slate-700'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2`}
+              title="Show mandatory tasks only"
+            >
+              Mandatory
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterMandatory('skippable')}
+              aria-pressed={mandatory === 'skippable'}
+              className={`px-3 py-1.5 text-sm border-l border-black/10 dark:border-white/10 ${mandatory === 'skippable' ? 'bg-blue-600 text-white' : 'bg-slate-200 dark:bg-slate-700'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2`}
+              title="Show skippable tasks only"
+            >
+              Skippable
+            </button>
+          </div>
+        </div>
+        <div>
+          <span id={timeWindowLabelId} className="block text-sm mb-1">Time window</span>
+          <div role="group" aria-labelledby={timeWindowLabelId} className="inline-flex flex-wrap gap-2">
+            {(['morning','afternoon','evening','anytime'] as const).map((w) => {
+              const selected = timeWindows.has(w);
+              return (
+                <button
+                  key={w}
+                  type="button"
+                  onClick={() => toggleFilterTimeWindow(w)}
+                  aria-pressed={selected}
+                  className={`px-3 py-1.5 text-sm rounded-full border border-black/10 dark:border-white/10 ${selected ? 'bg-blue-600 text-white' : 'bg-slate-200 dark:bg-slate-700'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2`}
+                  title={`Toggle ${w}`}
+                >
+                  {w[0].toUpperCase() + w.slice(1)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="ml-auto">
+          <span className="block text-sm mb-1 invisible">Reset</span>
+          <button
+            type="button"
+            onClick={() => { resetFilters(); setSearchDraft(''); }}
+            className="px-3 py-1.5 rounded-md bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+            title="Reset all filters"
+          >
+            Reset Filters
+          </button>
+        </div>
+      </div>
       {loading ? (
         <p className="text-sm text-black/70 dark:text-white/70">Loading…</p>
       ) : (
+        <>
+        {recent.length > 0 && (
+          <section className="border rounded-md p-3 mb-4">
+            <h2 className="font-semibold mb-2">Recently Modified ({recent.length})</h2>
+            <ul className="divide-y divide-black/10 dark:divide-white/10">
+              {recent.map((t) => (
+                <li key={t.id} className="py-2 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="font-medium">{t.taskName}</div>
+                    <div className="text-sm text-black/60 dark:text-white/60">{t.schedulingType === 'fixed' ? `Fixed @ ${t.defaultTime}` : `Flexible (${t.timeWindow})`} • {t.durationMinutes}m</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button className="px-2 py-1 rounded-md bg-slate-200 dark:bg-slate-700" onClick={()=>{ setEditItem(t); setModalOpen(true); }}>Edit</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <section className="border rounded-md p-3">
             <h2 className="font-semibold mb-2">Active ({active.length})</h2>
@@ -258,20 +442,52 @@ export default function LibraryPage() {
               <p className="text-sm text-black/60 dark:text-white/60">No active templates.</p>
             ) : (
               <ul className="divide-y divide-black/10 dark:divide-white/10">
-                {active.map((t) => (
-                  <li key={t.id} className="py-2 flex items-center justify-between gap-3">
-                    <div>
-                      <div className="font-medium">{t.taskName}</div>
-                      <div className="text-sm text-black/60 dark:text-white/60">{t.schedulingType === 'fixed' ? `Fixed @ ${t.defaultTime}` : `Flexible (${t.timeWindow})`} • {t.durationMinutes}m</div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button className="px-2 py-1 rounded-md bg-slate-200 dark:bg-slate-700" onClick={()=>{ setEditItem(t); setModalOpen(true); }}>Edit</button>
-                      <button className="px-2 py-1 rounded-md bg-emerald-600 text-white" onClick={()=>toggleActive(t)}>Disable</button>
-                      <button className="px-2 py-1 rounded-md bg-blue-600 text-white" onClick={()=>onDuplicate(t)}>Duplicate</button>
-                      <button className="px-2 py-1 rounded-md bg-rose-600 text-white" onClick={()=>setConfirm({ id: t.id, name: t.taskName })}>Delete</button>
-                    </div>
-                  </li>
-                ))}
+                {active.map((t) => {
+                  const dep = getDependencyStatus(t, byId);
+                  const isCycle = dep?.status === 'cycle';
+                  const depName = dep?.dependsOnName ?? dep?.dependsOnId;
+                  const depTitle = isCycle
+                    ? 'Dependency cycle'
+                    : dep?.status === 'disabled'
+                      ? 'Prerequisite disabled'
+                      : dep?.status === 'missing'
+                        ? 'Prerequisite missing'
+                        : dep
+                          ? 'Prerequisite available'
+                          : undefined;
+                  const depClass = isCycle
+                    ? 'bg-rose-200 text-rose-900 dark:bg-rose-800 dark:text-rose-100'
+                    : dep?.status === 'disabled'
+                      ? 'bg-amber-200 text-amber-900 dark:bg-amber-800 dark:text-amber-100'
+                      : dep?.status === 'missing'
+                        ? 'bg-rose-200 text-rose-900 dark:bg-rose-800 dark:text-rose-100'
+                        : 'bg-slate-200 text-black/80 dark:bg-slate-700 dark:text-white/80';
+                  return (
+                    <li key={t.id} className="py-2 flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-medium">{t.taskName}</div>
+                        <div className="text-sm text-black/60 dark:text-white/60">{t.schedulingType === 'fixed' ? `Fixed @ ${t.defaultTime}` : `Flexible (${t.timeWindow})`} • {t.durationMinutes}m</div>
+                        {dep ? (
+                          <div className="mt-1">
+                            <span
+                              className={`inline-block text-xs px-2 py-0.5 rounded-full ${depClass}`}
+                              title={depTitle}
+                              aria-label={isCycle ? 'Dependency cycle' : undefined}
+                            >
+                              {isCycle ? 'Cycle' : <>Depends on {depName}</>}
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="flex gap-2">
+                        <button className="px-2 py-1 rounded-md bg-slate-200 dark:bg-slate-700" onClick={()=>{ setEditItem(t); setModalOpen(true); }}>Edit</button>
+                        <button className="px-2 py-1 rounded-md bg-emerald-600 text-white" onClick={()=>toggleActive(t)}>Disable</button>
+                        <button className="px-2 py-1 rounded-md bg-blue-600 text-white" onClick={()=>onDuplicate(t)}>Duplicate</button>
+                        <button className="px-2 py-1 rounded-md bg-rose-600 text-white" onClick={()=>setConfirm({ id: t.id, name: t.taskName })}>Delete</button>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>
@@ -282,21 +498,54 @@ export default function LibraryPage() {
               <p className="text-sm text-black/60 dark:text-white/60">None.</p>
             ) : (
               <ul className="divide-y divide-black/10 dark:divide-white/10">
-                {inactive.map((t) => (
-                  <li key={t.id} className="py-2 flex items-center justify-between gap-3 opacity-70">
-                    <div>
-                      <div className="font-medium">{t.taskName}</div>
-                      <div className="text-sm text-black/60 dark:text-white/60">{t.schedulingType === 'fixed' ? `Fixed @ ${t.defaultTime}` : `Flexible (${t.timeWindow})`} • {t.durationMinutes}m</div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button className="px-2 py-1 rounded-md bg-emerald-600 text-white" onClick={()=>toggleActive(t)}>Restore</button>
-                    </div>
-                  </li>
-                ))}
+                {inactive.map((t) => {
+                  const dep = getDependencyStatus(t, byId);
+                  const isCycle = dep?.status === 'cycle';
+                  const depName = dep?.dependsOnName ?? dep?.dependsOnId;
+                  const depTitle = isCycle
+                    ? 'Dependency cycle'
+                    : dep?.status === 'disabled'
+                      ? 'Prerequisite disabled'
+                      : dep?.status === 'missing'
+                        ? 'Prerequisite missing'
+                        : dep
+                          ? 'Prerequisite available'
+                          : undefined;
+                  const depClass = isCycle
+                    ? 'bg-rose-200 text-rose-900 dark:bg-rose-800 dark:text-rose-100'
+                    : dep?.status === 'disabled'
+                      ? 'bg-amber-200 text-amber-900 dark:bg-amber-800 dark:text-amber-100'
+                      : dep?.status === 'missing'
+                        ? 'bg-rose-200 text-rose-900 dark:bg-rose-800 dark:text-rose-100'
+                        : 'bg-slate-200 text-black/80 dark:bg-slate-700 dark:text-white/80';
+                  return (
+                    <li key={t.id} className="py-2 flex items-center justify-between gap-3 opacity-70">
+                      <div>
+                        <div className="font-medium">{t.taskName}</div>
+                        <div className="text-sm text-black/60 dark:text-white/60">{t.schedulingType === 'fixed' ? `Fixed @ ${t.defaultTime}` : `Flexible (${t.timeWindow})`} • {t.durationMinutes}m</div>
+                        {dep ? (
+                          <div className="mt-1">
+                            <span
+                              className={`inline-block text-xs px-2 py-0.5 rounded-full ${depClass}`}
+                              title={depTitle}
+                              aria-label={isCycle ? 'Dependency cycle' : undefined}
+                            >
+                              {isCycle ? 'Cycle' : <>Depends on {depName}</>}
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="flex gap-2">
+                        <button className="px-2 py-1 rounded-md bg-emerald-600 text-white" onClick={()=>toggleActive(t)}>Restore</button>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>
         </div>
+        </>
       )}
 
       <ConfirmDialog

@@ -8,9 +8,15 @@ import { generateSchedule } from "@/lib/domain/scheduling/SchedulingEngine";
 import { listInstancesByDate, upsertInstance, deleteInstance, instanceIdFor } from "@/lib/data/instances";
 import { getCachedSchedule, putCachedSchedule } from "@/lib/data/schedules";
 
+type SortMode = 'name' | 'priority';
+type MandatoryFilter = 'all' | 'mandatory' | 'skippable';
+
 type FiltersState = {
   search: string;
   schedulingType: 'all' | 'flexible' | 'fixed';
+  sortMode: SortMode;
+  mandatory: MandatoryFilter;
+  timeWindows: Set<TimeWindow>;
 };
 
 type UiState = {
@@ -37,6 +43,12 @@ type AppState = {
   setCurrentDate: (date: string) => void;
   setViewMode: (mode: UiState['viewMode']) => void;
   setNewTaskPrefill: (prefill: UiState['newTaskPrefill']) => void;
+  // Filter actions
+  setFilterSearch: (search: string) => void;
+  setFilterSortMode: (mode: SortMode) => void;
+  setFilterMandatory: (v: MandatoryFilter) => void;
+  toggleFilterTimeWindow: (win: TimeWindow) => void;
+  resetFilters: () => void;
   preloadCachedSchedule: (date: string) => Promise<void>;
 
   setTaskTemplates: (templates: TaskTemplate[]) => void;
@@ -85,6 +97,9 @@ export const useAppStore = create<AppState>()(
       filters: {
         search: '',
         schedulingType: 'all',
+        sortMode: 'name',
+        mandatory: 'all',
+        timeWindows: new Set<TimeWindow>(),
       },
       scheduleCacheByDate: {},
 
@@ -103,6 +118,33 @@ export const useAppStore = create<AppState>()(
 
       setNewTaskPrefill(prefill) {
         set((s) => { s.ui.newTaskPrefill = prefill; });
+      },
+
+      // Filter actions
+      setFilterSearch(search) {
+        set((s) => { s.filters.search = search; });
+      },
+      setFilterSortMode(mode) {
+        set((s) => { s.filters.sortMode = mode; });
+      },
+      setFilterMandatory(v) {
+        set((s) => { s.filters.mandatory = v; });
+      },
+      toggleFilterTimeWindow(win) {
+        set((s) => {
+          const next = new Set(s.filters.timeWindows);
+          if (next.has(win)) next.delete(win); else next.add(win);
+          s.filters.timeWindows = next;
+        });
+      },
+      resetFilters() {
+        set((s) => {
+          s.filters.search = '';
+          s.filters.schedulingType = 'all';
+          s.filters.sortMode = 'name';
+          s.filters.mandatory = 'all';
+          s.filters.timeWindows = new Set<TimeWindow>();
+        });
       },
 
       async preloadCachedSchedule(date) {
@@ -389,6 +431,9 @@ export const useAppStore = create<AppState>()(
           s.ui.currentDate = todayISO();
           s.filters.search = '';
           s.filters.schedulingType = 'all';
+          s.filters.sortMode = 'name';
+          s.filters.mandatory = 'all';
+          s.filters.timeWindows = new Set<TimeWindow>();
         });
       },
 

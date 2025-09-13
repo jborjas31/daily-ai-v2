@@ -1,6 +1,6 @@
 "use client";
 import * as Dialog from "@radix-ui/react-dialog";
-import { useId } from "react";
+import React, { useId } from "react";
 
 export default function ConfirmDialog({
   open,

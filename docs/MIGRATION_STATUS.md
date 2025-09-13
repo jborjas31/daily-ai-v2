@@ -54,3 +54,14 @@ Update this file as tasks complete. Check items when merged into main.
 - [x] `docs/v2-migration-plan.md` updated with decisions and backlog
 - [x] `docs/v2-action-plan.md` committed and followed
  - [x] Root `README.md` updated for V2 context
+
+## Phase 5 — Library & Search (Progress)
+- [x] Store filters extended: `search`, `sortMode`, `mandatory`, `timeWindows`
+- [x] Filtering/sorting utils implemented with unit tests
+- [x] Library UI: debounced search, sort toggle, mandatory + time window filters
+- [x] Dependency badges with status (ok/missing/disabled/cycle)
+- [x] Category sections (Active, Deleted/Inactive) and “Recently Modified” rollup
+- [x] UI tests for Library behaviors (jsdom)
+- [x] Performance: memoized derived arrays; debounced store updates
+- [x] A11y: labeled controls, aria-pressed states, badge titles
+- [x] README docs: Library Search & Filters section

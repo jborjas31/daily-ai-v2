@@ -5,6 +5,7 @@ import {
   getDocs,
   updateDoc,
   doc,
+  serverTimestamp,
 } from "firebase/firestore";
 import type { TaskTemplate } from "@/lib/types";
 
@@ -22,16 +23,18 @@ export async function listTemplates(uid: string): Promise<TaskTemplate[]> {
 }
 
 export async function createTemplate(uid: string, tpl: Omit<TaskTemplate, 'id'>): Promise<TaskTemplate> {
-  const res = await addDoc(col(uid), tpl);
-  return { ...tpl, id: res.id };
+  const payload = { ...tpl, updatedAt: serverTimestamp() } as Omit<TaskTemplate, 'id'> & { updatedAt: unknown };
+  const res = await addDoc(col(uid), payload);
+  // Return with a local updatedAt epoch for immediate UI recency; server value lands on next fetch
+  return { ...tpl, id: res.id, updatedAt: Date.now() } as TaskTemplate;
 }
 
 export async function updateTemplate(uid: string, id: string, updates: Partial<TaskTemplate>): Promise<void> {
-  await updateDoc(ref(uid, id), updates);
+  await updateDoc(ref(uid, id), { ...updates, updatedAt: serverTimestamp() });
 }
 
 export async function softDeleteTemplate(uid: string, id: string): Promise<void> {
-  await updateDoc(ref(uid, id), { isActive: false });
+  await updateDoc(ref(uid, id), { isActive: false, updatedAt: serverTimestamp() });
 }
 
 export async function duplicateTemplate(uid: string, tpl: TaskTemplate): Promise<TaskTemplate> {
@@ -49,6 +52,7 @@ export async function duplicateTemplate(uid: string, tpl: TaskTemplate): Promise
     dependsOn: tpl.dependsOn,
     recurrenceRule: tpl.recurrenceRule,
   };
-  const res = await addDoc(col(uid), copy);
-  return { ...copy, id: res.id };
+  const payload = { ...copy, updatedAt: serverTimestamp() };
+  const res = await addDoc(col(uid), payload);
+  return { ...copy, id: res.id, updatedAt: Date.now() } as TaskTemplate;
 }

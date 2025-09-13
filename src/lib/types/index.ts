@@ -23,6 +23,8 @@ export interface TaskTemplate {
   minDurationMinutes?: number;
   dependsOn?: string; // templateId
   recurrenceRule?: unknown;
+  // Optional metadata: last updated time (server timestamp/epoch)
+  updatedAt?: unknown;
 }
 
 export type InstanceStatus = 'pending' | 'completed' | 'skipped' | 'postponed';
