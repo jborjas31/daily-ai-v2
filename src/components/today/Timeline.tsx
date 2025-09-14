@@ -321,7 +321,7 @@ export default function Timeline() {
 
   return (
     <div
-      className="relative border rounded-lg overflow-hidden max-h-[80svh] overscroll-contain touch-pan-y"
+      className="relative border rounded-lg overflow-y-auto h-[80svh] overscroll-contain touch-pan-y"
       ref={(el) => { containerRef.current = el; containerRefForOutside.current = el; }}
       data-testid="timeline"
     >
