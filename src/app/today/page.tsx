@@ -280,7 +280,18 @@ export default function TodayPage() {
               toastError('save');
               return;
             }
-            const created = await createTemplate(user.uid, payload);
+            // For one-off tasks created from Today, scope to the selected date when no recurrence is set
+            const withScopedRecurrence = (() => {
+              const p = payload as Omit<TaskTemplate, 'id'>;
+              const hasRule = !!(p as any).recurrenceRule;
+              if (hasRule) return p;
+              // Inject a 'none' recurrence bounded to current date
+              return {
+                ...p,
+                recurrenceRule: { frequency: 'none', startDate: currentDate, endDate: currentDate },
+              } as Omit<TaskTemplate, 'id'>;
+            })();
+            const created = await createTemplate(user.uid, withScopedRecurrence);
             upsert(created);
             toastSuccess('create');
           } catch {

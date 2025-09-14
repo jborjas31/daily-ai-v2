@@ -132,8 +132,15 @@ export function shouldGenerateCustom(rule: RecurrenceRule, date: Date): boolean 
 }
 
 export function shouldGenerateForDate(rule: RecurrenceRule | undefined, date: string | Date): boolean {
-  if (!rule || rule.frequency === 'none') return true;
+  // Default legacy behavior: no rule means always eligible
+  if (!rule) return true;
   const target = toDate(date);
+  // Special-case: frequency 'none' can carry an optional date range to scope a one-off
+  if (rule.frequency === 'none') {
+    // If a range is provided, only generate within the range; otherwise treat as always eligible
+    if (rule.startDate || rule.endDate) return isWithinRecurrenceDateRange(rule, target);
+    return true;
+  }
   if (!isWithinRecurrenceDateRange(rule, target)) return false;
   // Occurrence limits would require counting instances; defer for MVP
   switch (rule.frequency) {

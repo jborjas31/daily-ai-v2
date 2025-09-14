@@ -198,7 +198,122 @@ Acceptance:
 ## Acceptance Summary (Phase 7)
 
 - Offline write attempts never block UI, and changes survive reloads.
+
+## 10) Timeline Task Details (Google Calendar-style)
+
+Status: Planned
+
+10.1 Pattern and UX
+- Single-click a timeline block opens a contextual details popover anchored to the clicked block (desktop). On small screens, show a bottom sheet (Dialog) instead.
+- Popover content mirrors Google Calendar’s event card: concise summary with quick actions, and a primary Edit action that opens the full edit modal.
+- Only one popover is open at a time. Clicking outside or pressing Escape closes it and returns focus to the originating block.
+- Keyboard: when a block is focused, Enter/Space opens details. Tab order starts at the title, then quick actions, then Edit, then Close.
+
+10.2 Content and Actions
+- Header: task name; time range; chips for Mandatory/Fixed/Flex; optional status badge if completed/skipped.
+- Body: optional notes/description preview; duration; buffer minutes; next occurrence (if applicable).
+- Quick actions: Mark done, Skip, Postpone (preset choices like +30m, Later today, Tomorrow), Start now (for overdue/anchored tasks), and Duplicate.
+- Primary: Edit → opens existing `TaskModal` prefilled with the template for full editing.
+- All actions call existing store methods (`toggleComplete`, `skipInstance`, `postponeInstance`, `setInstanceStartTime`, `duplicateTemplate`, `updateTemplate`) and integrate with the Phase 7 offline write queue.
+
+10.3 Routing and State
+- Route-based state for deep-linking/back navigation: update URL with `?taskId={id}` when opening details; remove it when closing. Use Next.js App Router `router.replace` to avoid noisy history when toggling.
+- UI state: extend `useAppStore.ui` with `{ selectedTaskId?: string, isTaskDetailsOpen: boolean }` to coordinate popover/drawer visibility across the app.
+- Prefetch: on hover/focus of a block, optionally prefetch the template/instance from cache to minimize open latency.
+
+10.4 Technical Implementation
+- Desktop popover: use `@radix-ui/react-popover` anchored to the block element; prefer `side="right"` with collision handling and fallbacks to avoid viewport clipping. Render via portal.
+- Mobile drawer: reuse Radix Dialog styled as a bottom sheet; trap focus; swipe-to-close optional (non-blocking polish).
+- Focus management: on open, set initial focus to the title; on close, return focus to the originating block. Ensure Escape closes both popover and dialog.
+- Event handling: attach `onClick` and keyboard handlers to each `timeline-block` to call `openTaskDetails(templateId)`; stop propagation for buttons inside the block.
+- Data source: compute the card from store data using `templateId` + current date to derive the `TaskInstance` (if any).
+- Error/edge: if a template is missing, show a lightweight error and close. If an action fails hard, surface the Phase 7 failure toast with Retry/Undo (3.3).
+
+10.5 Accessibility
+- Blocks: ensure every `timeline-block` is keyboard-focusable (`tabIndex=0`) and exposes a readable `aria-label` with task name and time; preserve existing drag affordances.
+- Popover/Dialog: `role="dialog"` with `aria-labelledby` and `aria-describedby`; use a focus trap; ensure labels for all buttons (e.g., "Mark done", "Skip").
+- Motion: respect `prefers-reduced-motion` for popover/drawer transitions.
+
+10.6 Acceptance
+- Click on any timeline block opens a details view (popover on desktop, bottom sheet on mobile) with correct task metadata and quick actions.
+- Enter/Space opens; Escape and outside click close; focus returns to the originating block after close.
+- Edit opens the existing `TaskModal` with prefilled data; saving updates the task and closes the modal, reflecting changes on the timeline.
+- Quick actions apply optimistically and queue offline when needed; UI reflects sync state via the Phase 7 badge/toast.
+- URL reflects `?taskId={id}` while open and cleans up on close; refresh with the param restores the open details view.
+
+10.7 Files/Modules (Proposed)
+- `src/components/today/TaskDetailsCard.tsx` — content component rendering details + actions.
+- `src/components/today/TaskDetailsPopover.tsx` — Radix Popover wrapper for desktop, anchors to a block.
+- `src/components/today/TaskDetailsSheet.tsx` — Radix Dialog styled as bottom sheet for mobile.
+- `src/components/today/Timeline.tsx` — wire click/keyboard handlers to open details; pass anchor refs; ensure blocks are focusable.
+- `src/store/useAppStore.ts` — extend `ui` slice with selectedTaskId/isTaskDetailsOpen; reuse existing actions.
+- `src/components/library/TaskModal.tsx` — reused for full edit flow.
 - A small badge indicates “Offline (N queued)”, “Syncing… (N)”, or “All changes saved”.
 - On conflict, a single concise toast offers Retry/Undo and avoids spam.
 - Optional SW flush path prepared; not required for MVP completion.
 
+---
+
+## Appendix A — Calendar‑Style QoL Improvements (Deferred)
+
+Low‑risk Google Calendar–style enhancements to implement after Phase 7 core is complete.
+
+1) Scroll‑to‑Now Button
+- Floating “Now” button appears when the now‑line is off‑screen; scrolls timeline to current time.
+- Files: `src/components/today/Timeline.tsx`.
+- Accept: Appears only when now‑line is outside viewport; smooth scroll.
+
+2) Drag Preview Time Tooltip
+- While dragging a block, show a tiny tooltip with the snapped start time.
+- Files: `Timeline.tsx` (TimelineBlock).
+- Accept: Updates during drag; hides on drop.
+
+3) Ghost Drop Indicator
+- Thin horizontal guide line at the snapped drop Y while dragging.
+- Files: `Timeline.tsx` (TimelineBlock/parent overlay).
+- Accept: Tracks drag; removed after drop.
+
+4) Edge Auto‑Scroll While Dragging
+- Auto‑scroll timeline near top/bottom edges during drag.
+- Files: `Timeline.tsx` (TimelineBlock with container ref prop).
+- Accept: Smooth, bounded; no jitter.
+
+5) Keyboard Shortcuts (Calendar‑style)
+- Left/Right: prev/next day; T: today; N: new task.
+- Files: `src/app/today/page.tsx`.
+- Accept: Disabled when typing/in modal.
+
+6) Keyboard Nudge for Focused Block
+- Up/Down adjusts a focused draggable block by 5m (Shift=15m).
+- Files: `Timeline.tsx`.
+- Accept: Non‑mandatory only; respects bounds.
+
+7) Long‑Press to Add (Mobile Grid)
+- Long‑press on grid to open New Task prefilled with that time.
+- Files: `Timeline.tsx`.
+- Accept: Doesn’t interfere with scrolling.
+
+8) “Now” Label on Now‑Line
+- Small “Now” pill attached to the red line.
+- Files: `Timeline.tsx`.
+- Accept: Today only; unobtrusive.
+
+9) Undo After Move
+- Toast with “Undo” after moving a block to revert.
+- Files: `Timeline.tsx` (TimelineBlock), `@/lib/ui/toast`.
+- Accept: Restores exact prior time.
+
+10) Hover Micro‑Actions for Flexible Blocks
+- “−5m/+5m” buttons on hover (desktop only).
+- Files: `Timeline.tsx`.
+- Accept: Hidden on touch; respects snapping.
+
+11) Subtle Overlap Hint
+- When `+X more` is shown, lightly outline the overlapping time band.
+- Files: `Timeline.tsx` alongside `moreBadges`.
+- Accept: Only when overlaps exist; low visual weight.
+
+12) Slight “Haptic” Visual on Drag Start
+- Brief 98% scale or shadow pulse on drag start, revert on end.
+- Files: `Timeline.tsx` (TimelineBlock).
+- Accept: Respects `prefers-reduced-motion`.

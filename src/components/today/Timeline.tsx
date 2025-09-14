@@ -5,7 +5,7 @@ import { useAppStore } from "@/store/useAppStore";
 import type { TaskTemplate } from "@/lib/types";
 import { toMinutes, fromMinutes, todayISO } from "@/lib/time";
 import type { TimeString } from "@/lib/time";
-import { motion, type PanInfo } from "framer-motion";
+import { motion, type PanInfo, useDragControls } from "framer-motion";
 import { toastResult } from "@/lib/ui/toast";
 import useNowTick from "@/lib/utils/useNowTick";
 import assignLanes from "@/lib/timeline/lanes";
@@ -373,107 +373,14 @@ export default function Timeline() {
 
         {/* Scheduled blocks */}
         {blocksWithLanes.map((b) => {
-          const key = b.id + b.start;
           if (b.hidden) return null;
-          const LEFT_PX = 80; // matches left gutter used for hour labels
-          const RIGHT_PX = 12; // approx right padding (right-3)
-          const GAP_PX = 8; // horizontal gutter between lanes (polish guideline 8–12px)
-          const laneCount = b.laneCount || 1;
-          const laneIndex = b.laneIndex ?? 0;
-          const laneW = `calc((100% - ${LEFT_PX}px - ${RIGHT_PX}px - ${GAP_PX}px * (${laneCount - 1})) / ${laneCount})`;
-          const leftCalc = `calc(${LEFT_PX}px + ((${laneW} + ${GAP_PX}px) * ${laneIndex}))`;
-          const dragProps = b.draggable ? {
-            drag: "y" as const,
-            dragMomentum: false,
-            onDragEnd: async (_: unknown, info: PanInfo) => {
-              const newTopPx = b.top + info.offset.y;
-              const maxTopPx = minutesToY(TOTAL_MINUTES - b.dur);
-              const boundedTop = Math.max(0, Math.min(newTopPx, maxTopPx));
-              const newStartMinsRaw = (boundedTop / ROW_HEIGHT) * 60;
-              // snap to 5 minute increments
-              const snapped = Math.round(newStartMinsRaw / 5) * 5;
-              const hrs = Math.floor(snapped / 60);
-              const mins = snapped % 60;
-              const startStr = `${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}`;
-              const ok = await useAppStore.getState().setInstanceStartTime(useAppStore.getState().ui.currentDate, b.id, startStr);
-              toastResult('update', ok);
-            },
-          } : {};
-          const isOverdue = b.overdueKind !== 'no';
-          const semantics = b.isMandatory ? 'mandatory' : (b.isFixed ? 'fixed' : 'flexible');
           return (
-            <motion.div
-              key={key}
-              className={`group absolute ${b.bg} ${b.border} border rounded-md text-[12px] text-white shadow-sm p-2 ${b.draggable ? 'cursor-grab active:cursor-grabbing' : ''} ${b.extra || ''} focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
-              tabIndex={isOverdue ? 0 : undefined}
-              style={{ top: b.top, height: b.height, left: leftCalc, width: laneW, transform: `translateY(${b.transformY || 0}px)` }}
-              transition={prefersReducedMotion ? { duration: 0 } : { type: 'tween', duration: 0.2, ease: 'easeOut' }}
-              data-overdue={b.overdueKind}
-              data-testid="timeline-block"
-              title={`${b.label} — ${b.start}–${b.end} (${semantics})`}
-              aria-label={`Task ${b.label}, ${b.start} to ${b.end}, ${semantics}${isOverdue ? ', overdue' : ''}`}
-              {...dragProps}
-            >
-              <div className="flex items-center gap-1">
-                <span
-                  className="inline-flex items-center rounded-sm bg-white/85 text-black text-[10px] px-1 py-0.5"
-                  aria-hidden
-                  title={b.isMandatory ? 'Mandatory task' : (b.isFixed ? 'Fixed time task' : 'Flexible task')}
-                >
-                  {b.isMandatory ? 'M' : (b.isFixed ? 'Fixed' : 'Flex')}
-                </span>
-                <div className="font-medium truncate">{b.label}</div>
-              </div>
-              <div className="opacity-90">{b.start}–{b.end}{b.draggable ? ' • drag to move' : ''}</div>
-              {/* Subtle overdue badge (desktop on hover/focus) */}
-              {isOverdue ? (
-                <div
-                  className="hidden md:block absolute right-1 top-1 text-[10px] px-1.5 py-0.5 rounded-full bg-black/60 backdrop-blur-sm text-white opacity-0 group-hover:opacity-90 group-focus-visible:opacity-90 pointer-events-none transition-opacity duration-150"
-                  title={b.overdueKind === 'mandatory' ? 'Overdue — visually re-seated to now' : 'Overdue'}
-                  aria-hidden
-                >
-                  Overdue
-                </div>
-              ) : null}
-
-              {/* Overdue micro-actions for mandatory tasks: Start now / Mark done */}
-              {b.overdueKind === 'mandatory' ? (
-                <div
-                  className={`absolute right-1 bottom-1 inline-flex gap-1 ${
-                    prefersReducedMotion ? '' : 'transition-opacity duration-150'
-                  } opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 pointer-events-none group-hover:pointer-events-auto group-focus-visible:pointer-events-auto`}
-                  role="group"
-                  aria-label="Overdue actions"
-                >
-                  <button
-                    type="button"
-                    className="px-1.5 py-0.5 rounded-md bg-white/90 text-black text-[11px] hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      const ok = await useAppStore.getState().setInstanceStartTime(useAppStore.getState().ui.currentDate, b.id, nowTime as TimeString);
-                      toastResult('update', ok);
-                    }}
-                    aria-label="Start now"
-                    title="Start now"
-                  >
-                    Start now
-                  </button>
-                  <button
-                    type="button"
-                    className="px-1.5 py-0.5 rounded-md bg-white/90 text-black text-[11px] hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      const ok = await useAppStore.getState().toggleComplete(useAppStore.getState().ui.currentDate, b.id);
-                      toastResult('complete', ok);
-                    }}
-                    aria-label="Mark done"
-                    title="Mark done"
-                  >
-                    Mark done
-                  </button>
-                </div>
-              ) : null}
-            </motion.div>
+            <TimelineBlock
+              key={b.id + b.start}
+              block={b}
+              prefersReducedMotion={prefersReducedMotion}
+              nowTime={nowTime as TimeString}
+            />
           );
         })}
 
@@ -561,5 +468,211 @@ export default function Timeline() {
         ))}
       </div>
     </div>
+  );
+}
+
+// Small subcomponent per block to attach per-element drag controls with a start threshold
+function TimelineBlock({ block: b, prefersReducedMotion, nowTime }: {
+  block: any; // type-light to avoid leaking internals
+  prefersReducedMotion: boolean;
+  nowTime: TimeString;
+}) {
+  // Geometry helpers (keep in sync with parent)
+  const LEFT_PX = 80; // matches left gutter used for hour labels
+  const RIGHT_PX = 12; // approx right padding (right-3)
+  const GAP_PX = 8; // horizontal gutter between lanes
+  const laneCount = b.laneCount || 1;
+  const laneIndex = b.laneIndex ?? 0;
+  const laneW = `calc((100% - ${LEFT_PX}px - ${RIGHT_PX}px - ${GAP_PX}px * (${laneCount - 1})) / ${laneCount})`;
+  const leftCalc = `calc(${LEFT_PX}px + ((${laneW} + ${GAP_PX}px) * ${laneIndex}))`;
+
+  const isOverdue = b.overdueKind !== 'no';
+  const semantics = b.isMandatory ? 'mandatory' : (b.isFixed ? 'fixed' : 'flexible');
+
+  // Drag controls with a start threshold/long-press
+  const dragControls = useDragControls();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const stateRef = useRef<{
+    active: boolean;
+    started: boolean;
+    startX: number;
+    startY: number;
+    pointerId: number | null;
+    pointerType: string | null;
+    timer: number | null;
+  }>({ active: false, started: false, startX: 0, startY: 0, pointerId: null, pointerType: null, timer: null });
+
+  const DRAG_START_Y = 8; // px movement required to start drag ("give")
+  const TOUCH_LONG_PRESS_MS = 180; // slight hold on touch before drag
+
+  const clearWatchers = () => {
+    const s = stateRef.current;
+    if (s.timer != null) {
+      window.clearTimeout(s.timer);
+      s.timer = null;
+    }
+    window.removeEventListener('pointermove', onDocPointerMove, true);
+    window.removeEventListener('pointerup', onDocPointerUp, true);
+    window.removeEventListener('pointercancel', onDocPointerUp, true);
+    s.active = false;
+    s.started = false;
+    s.pointerId = null;
+    s.pointerType = null;
+  };
+
+  const startDragNow = (ev: PointerEvent) => {
+    const s = stateRef.current;
+    if (s.started) return;
+    s.started = true;
+    try {
+      // Start controlled drag using the current pointer event
+      dragControls.start(ev as any);
+    } catch {}
+    // Once drag starts, we can drop our listeners and let Framer Motion handle it
+    clearWatchers();
+  };
+
+  const onDocPointerMove = (ev: PointerEvent) => {
+    const s = stateRef.current;
+    if (!s.active || s.started) return;
+    // Only consider vertical movement to initiate a drag
+    const dy = Math.abs(ev.clientY - s.startY);
+    if (dy >= DRAG_START_Y) {
+      startDragNow(ev);
+    }
+  };
+
+  const onDocPointerUp = () => {
+    clearWatchers();
+  };
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!b.draggable) return;
+    // Do not prevent default here to preserve scrolling; we only start drag after threshold
+    const s = stateRef.current;
+    s.active = true;
+    s.started = false;
+    s.startX = e.clientX;
+    s.startY = e.clientY;
+    s.pointerId = e.pointerId;
+    s.pointerType = e.pointerType;
+    // Attach temporary listeners while waiting for threshold
+    window.addEventListener('pointermove', onDocPointerMove, true);
+    window.addEventListener('pointerup', onDocPointerUp, true);
+    window.addEventListener('pointercancel', onDocPointerUp, true);
+    // On touch, also allow a short long-press to start drag without movement
+    if (e.pointerType === 'touch') {
+      s.timer = window.setTimeout(() => {
+        // If still active and not started by movement, begin drag
+        if (stateRef.current.active && !stateRef.current.started) {
+          // Synthesize with last known pointer position: use original coords
+          const synthetic = new PointerEvent('pointermove', {
+            clientX: stateRef.current.startX,
+            clientY: stateRef.current.startY,
+            pointerId: stateRef.current.pointerId ?? undefined,
+            pointerType: 'touch',
+            bubbles: true,
+            cancelable: true,
+          });
+          startDragNow(synthetic);
+        }
+      }, TOUCH_LONG_PRESS_MS) as unknown as number;
+    }
+  };
+
+  const dragProps = b.draggable ? {
+    drag: 'y' as const,
+    dragControls,
+    dragListener: false,
+    dragMomentum: false,
+    onPointerDown,
+    onDragEnd: async (_: unknown, info: PanInfo) => {
+      // Compute new start by applying the drag offset to the block's top
+      const newTopPx = b.top + info.offset.y;
+      const maxTopPx = minutesToY(TOTAL_MINUTES - b.dur);
+      const boundedTop = Math.max(0, Math.min(newTopPx, maxTopPx));
+      const newStartMinsRaw = (boundedTop / ROW_HEIGHT) * 60;
+      const snapped = Math.round(newStartMinsRaw / 5) * 5; // snap to 5 minutes
+      const hrs = Math.floor(snapped / 60);
+      const mins = snapped % 60;
+      const startStr = `${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}`;
+      const ok = await useAppStore.getState().setInstanceStartTime(useAppStore.getState().ui.currentDate, b.id, startStr);
+      toastResult('update', ok);
+    },
+  } : {};
+
+  useEffect(() => () => clearWatchers(), []);
+
+  return (
+    <motion.div
+      ref={rootRef}
+      className={`group absolute ${b.bg} ${b.border} border rounded-md text-[12px] text-white shadow-sm p-2 ${b.draggable ? 'cursor-grab active:cursor-grabbing' : ''} ${b.extra || ''} focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
+      tabIndex={isOverdue ? 0 : undefined}
+      style={{ top: b.top, height: b.height, left: leftCalc, width: laneW, transform: `translateY(${b.transformY || 0}px)` }}
+      transition={prefersReducedMotion ? { duration: 0 } : { type: 'tween', duration: 0.2, ease: 'easeOut' }}
+      data-overdue={b.overdueKind}
+      data-testid="timeline-block"
+      title={`${b.label} — ${b.start}–${b.end} (${semantics})`}
+      aria-label={`Task ${b.label}, ${b.start} to ${b.end}, ${semantics}${isOverdue ? ', overdue' : ''}`}
+      {...dragProps}
+    >
+      <div className="flex items-center gap-1">
+        <span
+          className="inline-flex items-center rounded-sm bg-white/85 text-black text-[10px] px-1 py-0.5"
+          aria-hidden
+          title={b.isMandatory ? 'Mandatory task' : (b.isFixed ? 'Fixed time task' : 'Flexible task')}
+        >
+          {b.isMandatory ? 'M' : (b.isFixed ? 'Fixed' : 'Flex')}
+        </span>
+        <div className="font-medium truncate">{b.label}</div>
+      </div>
+      <div className="opacity-90">{b.start}–{b.end}{b.draggable ? ' • drag to move' : ''}</div>
+      {isOverdue ? (
+        <div
+          className="hidden md:block absolute right-1 top-1 text-[10px] px-1.5 py-0.5 rounded-full bg-black/60 backdrop-blur-sm text-white opacity-0 group-hover:opacity-90 group-focus-visible:opacity-90 pointer-events-none transition-opacity duration-150"
+          title={b.overdueKind === 'mandatory' ? 'Overdue — visually re-seated to now' : 'Overdue'}
+          aria-hidden
+        >
+          Overdue
+        </div>
+      ) : null}
+
+      {b.overdueKind === 'mandatory' ? (
+        <div
+          className={`absolute right-1 bottom-1 inline-flex gap-1 ${
+            prefersReducedMotion ? '' : 'transition-opacity duration-150'
+          } opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 pointer-events-none group-hover:pointer-events-auto group-focus-visible:pointer-events-auto`}
+          role="group"
+          aria-label="Overdue actions"
+        >
+          <button
+            type="button"
+            className="px-1.5 py-0.5 rounded-md bg-white/90 text-black text-[11px] hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            onClick={async (e) => {
+              e.stopPropagation();
+              const ok = await useAppStore.getState().setInstanceStartTime(useAppStore.getState().ui.currentDate, b.id, nowTime as TimeString);
+              toastResult('update', ok);
+            }}
+            aria-label="Start now"
+            title="Start now"
+          >
+            Start now
+          </button>
+          <button
+            type="button"
+            className="px-1.5 py-0.5 rounded-md bg-white/90 text-black text-[11px] hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            onClick={async (e) => {
+              e.stopPropagation();
+              const ok = await useAppStore.getState().toggleComplete(useAppStore.getState().ui.currentDate, b.id);
+              toastResult('complete', ok);
+            }}
+            aria-label="Mark done"
+            title="Mark done"
+          >
+            Mark done
+          </button>
+        </div>
+      ) : null}
+    </motion.div>
   );
 }
