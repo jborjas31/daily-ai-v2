@@ -181,7 +181,7 @@ export default function Timeline() {
           extra = 'opacity-60';
         }
       }
-      const overdueKind = isOverdue ? (b.isMandatory ? 'mandatory' : 'skippable') : 'no';
+      const overdueKind = (isOverdue ? (b.isMandatory ? 'mandatory' : 'skippable') : 'no') as OverdueKind;
       return { ...b, bg, border, extra, transformY, overdueKind };
     });
   }, [baseBlocks, nowMins, isToday]);

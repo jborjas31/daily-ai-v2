@@ -1,0 +1,4 @@
+Run firebase deploy --only hosting --project daily-ai-v2 --non-interactive --message "CI deploy $GITHUB_SHA"
+
+Error: Failed to authenticate, have you run firebase login?
+Error: Process completed with exit code 1.

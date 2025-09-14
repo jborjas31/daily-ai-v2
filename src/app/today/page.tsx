@@ -12,6 +12,7 @@ import { toastError, toastSuccess } from "@/lib/ui/toast";
 import { toMinutes, todayISO } from "@/lib/time";
 import useNowTick from "@/lib/utils/useNowTick";
 import UpNextStrip from "@/components/today/UpNextStrip";
+import type { TaskTemplate } from "@/lib/types";
 
 function useNowMinutes() {
   const [mins, setMins] = useState(() => {

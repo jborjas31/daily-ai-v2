@@ -22,8 +22,6 @@ export default function ScopeDialog({
   templateName?: string;
   targetDate?: string; // YYYY-MM-DD
 }) {
-  const titleId = useId();
-  const descId = useId();
   const statusLabelId = useId();
   const [statusChoice, setStatusChoice] = useState<'' | InstanceStatus>('');
 

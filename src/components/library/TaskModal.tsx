@@ -1,6 +1,6 @@
 "use client";
 import * as Dialog from "@radix-ui/react-dialog";
-import React, { useEffect, useId, useState } from "react";
+import React, { useEffect, useState } from "react";
 import type { TaskTemplate, TimeWindow, TimeString } from "@/lib/types";
 import type { RecurrenceRule } from "@/lib/domain/scheduling/Recurrence";
 import { validateRecurrenceRule } from "@/lib/domain/scheduling/Recurrence";
@@ -71,8 +71,7 @@ export default function TaskModal({
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [isSaving, setIsSaving] = useState(false);
   const isEdit = !!initial;
-  const titleId = useId();
-  const descId = useId();
+  // Radix Dialog will link Title/Description automatically
   const setNewTaskPrefill = useAppStore((s) => s.setNewTaskPrefill);
 
   useEffect(() => {

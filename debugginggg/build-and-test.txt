@@ -1,0 +1,17 @@
+/home/runner/work/daily-ai-v2/daily-ai-v2/src/components/ui/ConfirmDialog.tsx
+Warning:   22:9  warning  'titleId' is assigned a value but never used  @typescript-eslint/no-unused-vars
+Warning:   23:9  warning  'descId' is assigned a value but never used   @typescript-eslint/no-unused-vars
+/home/runner/work/daily-ai-v2/daily-ai-v2/src/components/ui/ScopeDialog.tsx
+Warning:   25:9  warning  'titleId' is assigned a value but never used  @typescript-eslint/no-unused-vars
+Warning:   26:9  warning  'descId' is assigned a value but never used   @typescript-eslint/no-unused-vars
+✖ 6 problems (0 errors, 6 warnings)
+
+Run npm run typecheck
+> daily_ai_v2@0.1.0 typecheck
+> tsc -p tsconfig.json --noEmit
+Error: src/app/today/page.tsx(285,41): error TS2304: Cannot find name 'TaskTemplate'.
+Error: src/app/today/page.tsx(292,25): error TS2304: Cannot find name 'TaskTemplate'.
+Error: src/components/today/Timeline.tsx(380,15): error TS2322: Type '{ laneIndex: number | null; hidden: boolean; laneCount: number; bg: string; border: string; extra: string; transformY: number; overdueKind: string; top: number; height: number; label: string; id: string; ... 10 more ...; done: boolean; }' is not assignable to type 'TimelineBlockData'.
+  Types of property 'overdueKind' are incompatible.
+    Type 'string' is not assignable to type 'OverdueKind'.
+Error: Process completed with exit code 2.

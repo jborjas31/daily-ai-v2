@@ -1,6 +1,6 @@
 "use client";
 import * as Dialog from "@radix-ui/react-dialog";
-import React, { useId } from "react";
+import React from "react";
 
 export default function ConfirmDialog({
   open,
@@ -19,8 +19,6 @@ export default function ConfirmDialog({
   onConfirm: () => void;
   onOpenChange: (open: boolean) => void;
 }) {
-  const titleId = useId();
-  const descId = useId();
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
