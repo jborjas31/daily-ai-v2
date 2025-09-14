@@ -446,12 +446,12 @@ export default function LibraryPage() {
             <h2 className="font-semibold mb-2">Recently Modified ({recent.length})</h2>
             <ul className="divide-y divide-black/10 dark:divide-white/10">
               {recent.map((t) => (
-                <li key={t.id} className="py-2 flex items-center justify-between gap-3">
-                  <div>
+                <li key={t.id} className="py-2 flex flex-wrap items-center gap-3 md:justify-between">
+                  <div className="min-w-0 flex-1">
                     <div className="font-medium">{t.taskName}</div>
                     <div className="text-sm text-black/60 dark:text-white/60">{t.schedulingType === 'fixed' ? `Fixed @ ${t.defaultTime}` : `Flexible (${t.timeWindow})`} • {t.durationMinutes}m</div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 shrink-0">
                     <button className="px-2 py-1 rounded-md bg-slate-200 dark:bg-slate-700" onClick={()=>{ setEditItem(t); setModalOpen(true); }}>Edit</button>
                   </div>
                 </li>
@@ -487,8 +487,8 @@ export default function LibraryPage() {
                         ? 'bg-rose-200 text-rose-900 dark:bg-rose-800 dark:text-rose-100'
                         : 'bg-slate-200 text-black/80 dark:bg-slate-700 dark:text-white/80';
                   return (
-                    <li key={t.id} className="py-2 flex items-center justify-between gap-3">
-                      <div>
+                    <li key={t.id} className="py-2 flex flex-wrap items-center gap-3 md:justify-between">
+                      <div className="min-w-0 flex-1">
                         <div className="font-medium">{t.taskName}</div>
                         <div className="text-sm text-black/60 dark:text-white/60">{t.schedulingType === 'fixed' ? `Fixed @ ${t.defaultTime}` : `Flexible (${t.timeWindow})`} • {t.durationMinutes}m</div>
                         {recurrenceSummary(t.recurrenceRule as RecurrenceRule | undefined) ? (
@@ -508,7 +508,7 @@ export default function LibraryPage() {
                           </div>
                         ) : null}
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2 shrink-0 w-full md:w-auto">
                         <button className="px-2 py-1 rounded-md bg-slate-200 dark:bg-slate-700" onClick={()=>{ setEditItem(t); setModalOpen(true); }}>Edit</button>
                         <button className="px-2 py-1 rounded-md bg-emerald-600 text-white" onClick={()=>toggleActive(t)}>Disable</button>
                         <button className="px-2 py-1 rounded-md bg-blue-600 text-white" onClick={()=>onDuplicate(t)}>Duplicate</button>
@@ -548,8 +548,8 @@ export default function LibraryPage() {
                         ? 'bg-rose-200 text-rose-900 dark:bg-rose-800 dark:text-rose-100'
                         : 'bg-slate-200 text-black/80 dark:bg-slate-700 dark:text-white/80';
                   return (
-                    <li key={t.id} className="py-2 flex items-center justify-between gap-3 opacity-70">
-                      <div>
+                    <li key={t.id} className="py-2 flex flex-wrap items-center gap-3 md:justify-between opacity-70">
+                      <div className="min-w-0 flex-1">
                         <div className="font-medium">{t.taskName}</div>
                         <div className="text-sm text-black/60 dark:text-white/60">{t.schedulingType === 'fixed' ? `Fixed @ ${t.defaultTime}` : `Flexible (${t.timeWindow})`} • {t.durationMinutes}m</div>
                         {recurrenceSummary(t.recurrenceRule as RecurrenceRule | undefined) ? (
@@ -569,7 +569,7 @@ export default function LibraryPage() {
                           </div>
                         ) : null}
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2 shrink-0 w-full md:w-auto">
                         <button className="px-2 py-1 rounded-md bg-emerald-600 text-white" onClick={()=>toggleActive(t)}>Restore</button>
                       </div>
                     </li>
