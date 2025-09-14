@@ -283,7 +283,7 @@ export default function TodayPage() {
             // For one-off tasks created from Today, scope to the selected date when no recurrence is set
             const withScopedRecurrence = (() => {
               const p = payload as Omit<TaskTemplate, 'id'>;
-              const hasRule = !!(p as any).recurrenceRule;
+              const hasRule = p.recurrenceRule !== undefined;
               if (hasRule) return p;
               // Inject a 'none' recurrence bounded to current date
               return {

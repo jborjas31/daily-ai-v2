@@ -472,8 +472,35 @@ export default function Timeline() {
 }
 
 // Small subcomponent per block to attach per-element drag controls with a start threshold
+type OverdueKind = 'mandatory' | 'skippable' | 'no';
+interface TimelineBlockData {
+  top: number;
+  height: number;
+  bg: string;
+  border: string;
+  extra?: string;
+  label: string;
+  id: string;
+  start: TimeString | string;
+  end: TimeString | string;
+  startMin: number;
+  endMin: number;
+  draggable: boolean;
+  dur: number;
+  laneIndex: number | null;
+  laneCount: number;
+  hidden: boolean;
+  isFixed: boolean;
+  bufferMinutes?: number;
+  instModifiedStart?: string;
+  isMandatory: boolean;
+  done: boolean;
+  transformY?: number;
+  overdueKind: OverdueKind;
+}
+
 function TimelineBlock({ block: b, prefersReducedMotion, nowTime }: {
-  block: any; // type-light to avoid leaking internals
+  block: TimelineBlockData; // avoid leaking broader internals
   prefersReducedMotion: boolean;
   nowTime: TimeString;
 }) {
@@ -526,7 +553,7 @@ function TimelineBlock({ block: b, prefersReducedMotion, nowTime }: {
     s.started = true;
     try {
       // Start controlled drag using the current pointer event
-      dragControls.start(ev as any);
+      dragControls.start(ev);
     } catch {}
     // Once drag starts, we can drop our listeners and let Framer Motion handle it
     clearWatchers();
@@ -601,7 +628,22 @@ function TimelineBlock({ block: b, prefersReducedMotion, nowTime }: {
     },
   } : {};
 
-  useEffect(() => () => clearWatchers(), []);
+  useEffect(() => {
+    return () => {
+      const s = stateRef.current;
+      if (s.timer != null) {
+        window.clearTimeout(s.timer);
+        s.timer = null;
+      }
+      window.removeEventListener('pointermove', onDocPointerMove, true);
+      window.removeEventListener('pointerup', onDocPointerUp, true);
+      window.removeEventListener('pointercancel', onDocPointerUp, true);
+      s.active = false;
+      s.started = false;
+      s.pointerId = null;
+      s.pointerType = null;
+    };
+  }, []);
 
   return (
     <motion.div
