@@ -86,7 +86,7 @@ export default function Timeline() {
     };
   }, []);
 
-  // Fit full 24h into the container height on mobile; keep desktop fixed scale
+  // Mobile scale: enlarge to 2x container-fit; desktop uses fixed scale
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -98,7 +98,8 @@ export default function Timeline() {
     const compute = () => {
       const h = el.clientHeight || 0;
       if (h > 0) {
-        const target = Math.max(8, Math.floor(h / 24)); // keep at least 8px per hour for legibility
+        // Double the per-hour size relative to fit-to-container
+        const target = Math.max(8, Math.floor(h / 24) * 2); // min 8px/hour baseline
         setRowHeight(target);
       } else {
         // Fallback if no layout info in env (e.g., tests/SSR)
@@ -357,7 +358,7 @@ export default function Timeline() {
 
   return (
     <div
-      className="relative border rounded-lg overflow-y-hidden md:overflow-y-auto h-[80svh] overscroll-contain touch-pan-y"
+      className="relative border rounded-lg overflow-y-auto h-[80svh] overscroll-contain touch-pan-y"
       ref={(el) => { containerRef.current = el; containerRefForOutside.current = el; }}
       data-testid="timeline"
     >
