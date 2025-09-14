@@ -628,6 +628,7 @@ function TimelineBlock({ block: b, prefersReducedMotion, nowTime }: {
     },
   } : {};
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     return () => {
       const s = stateRef.current;
@@ -644,6 +645,7 @@ function TimelineBlock({ block: b, prefersReducedMotion, nowTime }: {
       s.pointerType = null;
     };
   }, []);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   return (
     <motion.div

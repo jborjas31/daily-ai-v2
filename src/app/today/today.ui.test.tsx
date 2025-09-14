@@ -25,7 +25,6 @@ vi.mock('@/lib/data/schedules', () => ({
 }));
 
 import TodayPage from './page';
-import { todayISO } from '@/lib/time';
 
 function addDaysISO(dateISO: string, delta: number) {
   const d = new Date(dateISO + 'T00:00:00');

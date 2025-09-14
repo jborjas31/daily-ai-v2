@@ -24,7 +24,6 @@ vi.mock('@/lib/data/schedules', () => ({
   putCachedSchedule: vi.fn(async () => {}),
 }));
 
-import { useAppStore } from '@/store/useAppStore';
 
 function tpl(partial: any) {
   return {

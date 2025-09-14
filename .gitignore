@@ -20,6 +20,7 @@
 .vitest-report.json
 /debugging/
 /console_log/
+/debuggingg/
 
 # production
 /build

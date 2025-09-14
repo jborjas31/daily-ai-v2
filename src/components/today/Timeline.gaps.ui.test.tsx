@@ -57,7 +57,7 @@ describe('Timeline gaps — Use gap pill', () => {
       tpl({ id: 'early', taskName: 'Early', defaultTime: '07:00', durationMinutes: 30 }),
     ]);
 
-    const user = userEvent.setup();
+    userEvent.setup();
     render(<TodayPage />);
 
     const timeline = screen.getAllByTestId('timeline').at(-1)!;
