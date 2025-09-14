@@ -19,34 +19,37 @@ export default function FirebaseClientProvider({ children }: { children: React.R
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let unsub = () => {};
-    (async () => {
+    // Subscribe to auth changes immediately so UI doesn't block on persistence
+    const unsub = authApi.onAuthStateChanged((u) => {
+      setUser(u);
+      setLoading(false);
+      // Reflect auth state in the app store
+      const st = useAppStore.getState();
+      st.setUser(u);
+      if (!u) {
+        st.resetAfterSignOut();
+      } else {
+        // Load persisted settings for this user (if present)
+        (async () => {
+          try {
+            const s = await getUserSettings(u.uid);
+            if (s) st.setSettings(s);
+          } catch (e) {
+            console.warn("Failed to load user settings", e);
+          }
+        })();
+      }
+    });
+
+    // Attempt to enable persistence in the background (non-blocking)
+    void (async () => {
       try {
         await ensureFirestorePersistence();
       } catch (e) {
         console.warn("Failed to enable Firestore persistence", e);
       }
-      unsub = authApi.onAuthStateChanged((u) => {
-        setUser(u);
-        setLoading(false);
-        // Reflect auth state in the app store
-        const st = useAppStore.getState();
-        st.setUser(u);
-        if (!u) {
-          st.resetAfterSignOut();
-        } else {
-          // Load persisted settings for this user (if present)
-          (async () => {
-            try {
-              const s = await getUserSettings(u.uid);
-              if (s) st.setSettings(s);
-            } catch (e) {
-              console.warn("Failed to load user settings", e);
-            }
-          })();
-        }
-      });
     })();
+
     return () => {
       try { unsub(); } catch {}
     };
