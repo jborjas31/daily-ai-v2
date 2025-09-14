@@ -40,13 +40,11 @@ export default function ScopeDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/40" />
         <Dialog.Content
-          aria-labelledby={titleId}
-          aria-describedby={descId}
           className="fixed inset-0 w-screen h-svh overflow-y-auto bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-none p-4 shadow-lg
                      sm:left-1/2 sm:top-1/2 sm:h-auto sm:w-[92vw] sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-md"
         >
-          <Dialog.Title id={titleId} className="text-base font-semibold mb-1">{title}</Dialog.Title>
-          <Dialog.Description id={descId} className="text-sm text-black/70 dark:text-white/70 mb-3">
+          <Dialog.Title className="text-base font-semibold mb-1">{title}</Dialog.Title>
+          <Dialog.Description className="text-sm text-black/70 dark:text-white/70 mb-3">
             {defaultMessage}
           </Dialog.Description>
 
