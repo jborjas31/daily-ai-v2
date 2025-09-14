@@ -6,7 +6,7 @@ import useRequireAuth from "@/components/guards/useRequireAuth";
 import { useAppStore } from "@/store/useAppStore";
 import type { AppState } from "@/store/useAppStore";
 import TaskModal from "@/components/library/TaskModal";
-import { createTemplate } from "@/lib/data/templates";
+import { createTemplate, listTemplates } from "@/lib/data/templates";
 import { toast } from "sonner";
 import { toastError, toastSuccess } from "@/lib/ui/toast";
 import { toMinutes, todayISO } from "@/lib/time";
@@ -32,6 +32,8 @@ export default function TodayPage() {
   const { user, ready } = useRequireAuth();
   const currentDate = useAppStore((s: AppState) => s.ui.currentDate);
   const setCurrentDate = useAppStore((s: AppState) => s.setCurrentDate);
+  const setTaskTemplates = useAppStore((s: AppState) => s.setTaskTemplates);
+  const templatesCount = useAppStore((s: AppState) => s.templates.length);
   const schedule = useAppStore((s: AppState) => s.generateScheduleForDate(s.ui.currentDate));
   const instances = useAppStore((s: AppState) => s.getTaskInstancesForDate(s.ui.currentDate));
   const loadInstancesForDate = useAppStore((s: AppState) => s.loadInstancesForDate);
@@ -79,6 +81,21 @@ export default function TodayPage() {
     loadInstancesForDate(currentDate);
     preloadCachedSchedule(currentDate);
   }, [ready, user, currentDate, loadInstancesForDate, preloadCachedSchedule]);
+
+  // Ensure templates are loaded on Today so task names render (not just IDs)
+  useEffect(() => {
+    if (!ready || !user) return;
+    if (process.env.NODE_ENV === 'test') return; // tests mock data; skip network
+    if (templatesCount > 0) return;
+    (async () => {
+      try {
+        const list = await listTemplates(user.uid);
+        setTaskTemplates(list);
+      } catch (e) {
+        console.warn('Failed to load templates', e);
+      }
+    })();
+  }, [ready, user, templatesCount, setTaskTemplates]);
 
   // Auto-open modal when a prefill is set (e.g., via gap pill or grid click)
   useEffect(() => {
