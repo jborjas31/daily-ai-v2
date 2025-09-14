@@ -11,11 +11,11 @@ import useNowTick from "@/lib/utils/useNowTick";
 import assignLanes from "@/lib/timeline/lanes";
 import detectGaps from "@/lib/timeline/gaps";
 
-const ROW_HEIGHT = 64; // px per hour (mobile-first)
+const BASE_ROW_HEIGHT = 64; // px per hour (desktop + default)
 const TOTAL_MINUTES = 24 * 60;
 
-function minutesToY(mins: number) {
-  return (mins / 60) * ROW_HEIGHT;
+function minutesToY(mins: number, rowHeight: number) {
+  return (mins / 60) * rowHeight;
 }
 
 export default function Timeline() {
@@ -28,6 +28,7 @@ export default function Timeline() {
   const { nowTime } = useNowTick(30_000);
   const nowMins = useMemo(() => toMinutes(nowTime as TimeString), [nowTime]);
   const setNewTaskPrefill = useAppStore((s) => s.setNewTaskPrefill);
+  const [rowHeight, setRowHeight] = useState<number>(BASE_ROW_HEIGHT);
   const [laneCap, setLaneCap] = useState<number>(() => {
     if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
       try {
@@ -85,12 +86,47 @@ export default function Timeline() {
     };
   }, []);
 
+  // Fit full 24h into the container height on mobile; keep desktop fixed scale
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const isDesktop = laneCap >= 3;
+    if (isDesktop) {
+      setRowHeight(BASE_ROW_HEIGHT);
+      return;
+    }
+    const compute = () => {
+      const h = el.clientHeight || 0;
+      if (h > 0) {
+        const target = Math.max(8, Math.floor(h / 24)); // keep at least 8px per hour for legibility
+        setRowHeight(target);
+      } else {
+        // Fallback if no layout info in env (e.g., tests/SSR)
+        setRowHeight(BASE_ROW_HEIGHT);
+      }
+    };
+    compute();
+    let ro: ResizeObserver | null = null;
+    try {
+      // Recompute when the container resizes (orientation/viewport changes)
+      ro = new ResizeObserver(() => compute());
+      ro.observe(el);
+    } catch {
+      // Older environments: listen to window resize
+      window.addEventListener('resize', compute);
+    }
+    return () => {
+      if (ro) ro.disconnect();
+      else window.removeEventListener('resize', compute);
+    };
+  }, [laneCap]);
+
   function handleGridClick(e: ReactMouseEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - rect.top;
     const height = e.currentTarget.clientHeight;
     const boundedY = Math.max(0, Math.min(y, height));
-    const minutesRaw = (boundedY / ROW_HEIGHT) * 60;
+    const minutesRaw = (boundedY / rowHeight) * 60;
     const snapped = Math.round(minutesRaw / 5) * 5;
     const hrs = Math.floor(snapped / 60);
     const mins = snapped % 60;
@@ -109,7 +145,7 @@ export default function Timeline() {
     const el = containerRef.current;
     if (!el) return;
     if (currentDate !== todayISO()) return;
-    const y = minutesToY(nowMins) - el.clientHeight / 2;
+    const y = minutesToY(nowMins, rowHeight) - el.clientHeight / 2;
     const top = Math.max(0, y);
     const maybeScroll = el as Element & { scrollTo?: (options: ScrollToOptions) => void };
     if (typeof maybeScroll.scrollTo === 'function') {
@@ -117,7 +153,7 @@ export default function Timeline() {
     } else {
       (el as HTMLDivElement).scrollTop = top;
     }
-  }, [currentDate, nowMins]);
+  }, [currentDate, nowMins, rowHeight]);
 
   const instMap = useMemo(() => new Map(instances.map((i) => [i.templateId, i])), [instances]);
   const isToday = currentDate === todayISO();
@@ -132,8 +168,8 @@ export default function Timeline() {
       const isFixed = t?.schedulingType === 'fixed';
       const inst = instMap.get(b.templateId);
       const done = !!inst && (inst.status === 'completed' || inst.status === 'skipped');
-      const baseTop = minutesToY(start);
-      const height = Math.max(8, minutesToY(dur));
+      const baseTop = minutesToY(start, rowHeight);
+      const height = Math.max(8, minutesToY(dur, rowHeight));
       // Base palette (time-independent)
       const bg = isMandatory ? 'bg-rose-600/85' : isFixed ? 'bg-blue-600/85' : 'bg-green-600/85';
       const border = isMandatory ? 'border-rose-800/80' : isFixed ? 'border-blue-800/80' : 'border-green-800/80';
@@ -172,7 +208,7 @@ export default function Timeline() {
       let extra = b.extra;
       let bg = b.bg;
       let border = b.border;
-      const transformY = isOverdue && b.isMandatory ? (minutesToY(now) - minutesToY(b.startMin)) : 0;
+      const transformY = isOverdue && b.isMandatory ? (minutesToY(now, rowHeight) - minutesToY(b.startMin, rowHeight)) : 0;
       if (isOverdue) {
         if (b.isMandatory) {
           bg = 'bg-rose-600';
@@ -188,14 +224,14 @@ export default function Timeline() {
 
   // Build buffer overlays (visual only) for anchors (fixed or manual override)
   const bufferOverlays: { top: number; height: number; key: string; kind: 'before' | 'after'; id: string }[] = [];
-  const GRID_PX = ROW_HEIGHT * 24;
+  const GRID_PX = rowHeight * 24;
   for (const b of blocks) {
     const isManualAnchor = !!b.instModifiedStart && b.instModifiedStart === b.start;
     const isAnchor = b.isFixed || isManualAnchor;
     if (!isAnchor) continue;
     const bufMin = Math.max(0, b.bufferMinutes ?? 8);
     if (bufMin <= 0) continue;
-    const bufPx = minutesToY(bufMin);
+    const bufPx = minutesToY(bufMin, rowHeight);
     // Before buffer
     const beforeTop = Math.max(0, b.top - bufPx);
     const beforeHeight = Math.min(bufPx, b.top);
@@ -290,13 +326,13 @@ export default function Timeline() {
     const s = toMinutes(sleep);
     const segs: { top: number; height: number }[] = [];
     if (w > 0) {
-      segs.push({ top: 0, height: minutesToY(w) });
+      segs.push({ top: 0, height: minutesToY(w, rowHeight) });
     }
     if (s < TOTAL_MINUTES) {
-      segs.push({ top: minutesToY(s), height: minutesToY(TOTAL_MINUTES - s) });
+      segs.push({ top: minutesToY(s, rowHeight), height: minutesToY(TOTAL_MINUTES - s, rowHeight) });
     }
     return segs;
-  }, [wake, sleep]);
+  }, [wake, sleep, rowHeight]);
 
   // 7.1 Detect gaps between blocks within awake window (>= 5 minutes)
   const awakeStart = useMemo(() => toMinutes(wake as TimeString), [wake]);
@@ -313,19 +349,19 @@ export default function Timeline() {
     const filtered = gaps.filter((g) => g.duration >= min);
     // Cap to first 3 to avoid clutter
     return filtered.slice(0, 3).map((g, idx) => {
-      const y = minutesToY(g.start) + 4;
+      const y = minutesToY(g.start, rowHeight) + 4;
       const label = `Use gap ${fromMinutes(g.start)}–${fromMinutes(g.end)}`;
       return { top: y, key: `${g.start}-${g.end}-${idx}`, aria: label, startMin: g.start };
     });
-  }, [gaps, isDesktop]);
+  }, [gaps, isDesktop, rowHeight]);
 
   return (
     <div
-      className="relative border rounded-lg overflow-y-auto h-[80svh] overscroll-contain touch-pan-y"
+      className="relative border rounded-lg overflow-y-hidden md:overflow-y-auto h-[80svh] overscroll-contain touch-pan-y"
       ref={(el) => { containerRef.current = el; containerRefForOutside.current = el; }}
       data-testid="timeline"
     >
-      <div className="relative select-none group" style={{ height: `${ROW_HEIGHT * 24}px` }} onClick={handleGridClick}>
+      <div className="relative select-none group" style={{ height: `${rowHeight * 24}px` }} onClick={handleGridClick}>
         {/* Sleep shading */}
         {sleepSegments.map((s, idx) => (
           <div
@@ -338,7 +374,7 @@ export default function Timeline() {
 
         {/* Hour grid */}
         {hours.map((h) => (
-          <div key={h} className="absolute left-0 right-0 border-b border-black/10 dark:border-white/10" style={{ top: minutesToY(h * 60) }}>
+          <div key={h} className="absolute left-0 right-0 border-b border-black/10 dark:border-white/10" style={{ top: minutesToY(h * 60, rowHeight) }}>
             <div className="absolute -translate-y-1/2 left-2 text-[11px] text-black/60 dark:text-white/60 select-none z-10">
               {String(h).padStart(2, '0')}:00
             </div>
@@ -366,7 +402,7 @@ export default function Timeline() {
         {currentDate === todayISO() ? (
           <div
             className="absolute left-0 right-0 top-0 h-[2px] bg-rose-500 pointer-events-none transition-transform duration-200 ease-out will-change-transform motion-reduce:transition-none opacity-70 group-hover:opacity-100 group-focus-within:opacity-100 group-hover:shadow-md group-focus-within:shadow-md z-0"
-            style={{ transform: `translateY(${minutesToY(nowMins)}px)` }}
+            style={{ transform: `translateY(${minutesToY(nowMins, rowHeight)}px)` }}
             aria-label="Now line"
           />
         ) : null}
@@ -380,6 +416,7 @@ export default function Timeline() {
               block={b}
               prefersReducedMotion={prefersReducedMotion}
               nowTime={nowTime as TimeString}
+              rowHeight={rowHeight}
             />
           );
         })}
@@ -499,10 +536,11 @@ interface TimelineBlockData {
   overdueKind: OverdueKind;
 }
 
-function TimelineBlock({ block: b, prefersReducedMotion, nowTime }: {
+function TimelineBlock({ block: b, prefersReducedMotion, nowTime, rowHeight }: {
   block: TimelineBlockData; // avoid leaking broader internals
   prefersReducedMotion: boolean;
   nowTime: TimeString;
+  rowHeight: number;
 }) {
   // Geometry helpers (keep in sync with parent)
   const LEFT_PX = 80; // matches left gutter used for hour labels
@@ -616,9 +654,9 @@ function TimelineBlock({ block: b, prefersReducedMotion, nowTime }: {
     onDragEnd: async (_: unknown, info: PanInfo) => {
       // Compute new start by applying the drag offset to the block's top
       const newTopPx = b.top + info.offset.y;
-      const maxTopPx = minutesToY(TOTAL_MINUTES - b.dur);
+      const maxTopPx = minutesToY(TOTAL_MINUTES - b.dur, rowHeight);
       const boundedTop = Math.max(0, Math.min(newTopPx, maxTopPx));
-      const newStartMinsRaw = (boundedTop / ROW_HEIGHT) * 60;
+      const newStartMinsRaw = (boundedTop / rowHeight) * 60;
       const snapped = Math.round(newStartMinsRaw / 5) * 5; // snap to 5 minutes
       const hrs = Math.floor(snapped / 60);
       const mins = snapped % 60;
