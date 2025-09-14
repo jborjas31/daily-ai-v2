@@ -72,3 +72,15 @@ Use this sequence to implement V2 step by step. Each step is small and verifiabl
 
 14) Nice-to-haves (post-MVP)
    - Timeline DnD, keyboard shortcuts, background sync, advanced toasts, analytics for performance.
+
+15) Library — Recurrence Editor (Phase 6)
+   - UI: Expose recurrence fields in Task modal: `frequency` (`none`|`daily`|`weekly`|`monthly`|`yearly`|`custom`), `interval`, `daysOfWeek` (weekly), `dayOfMonth`/`month` (monthly/yearly), `startDate`, `endDate`.
+   - Validation: Use `validateRecurrenceRule` from `src/lib/domain/scheduling/Recurrence.ts`; inline errors; disable Save while invalid.
+   - Persistence: Store `recurrenceRule` on templates via existing CRUD; ensure read/write works with Firestore offline.
+   - Series scope: Keep current `ScopeDialog` behavior for recurring edits — “Only this” (per‑date override), “This and future” (split series with date fences), “All”.
+   - Library list: Show a compact recurrence summary next to each template (e.g., “Weekly · Mon/Fri”, “Daily · every 2 days”, “Ends 2025‑06‑30”).
+   - Acceptance (DoD):
+     - User can create and edit recurring tasks (daily/weekly/monthly/yearly) with intervals and date fences.
+     - Scheduler respects occurrences for the selected date.
+     - Editing a recurring task triggers Scope dialog when changes affect recurrence.
+     - “Only this” supports time change for fixed tasks and optional per‑date status override.

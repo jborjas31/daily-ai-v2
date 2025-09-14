@@ -68,6 +68,34 @@ Open http://localhost:3000 and navigate to `/today`.
 
 See Phase 5 plan for details: `docs/phase-5-action-plan.md`.
 
+## Today: Date & Real‑Time
+
+- Live clock and now‑line
+  - Header shows the current local time (HH:MM), updated every ~30 seconds.
+  - A subtle now‑line appears on the timeline when viewing Today; it updates smoothly and hides on non‑today dates.
+- Date navigation
+  - Prev / Today / Next buttons, plus a native date input, update the store date and re‑render Today.
+  - Today recenters the timeline vertically near “now”.
+- Overlaps and lane limits
+  - Overlapping blocks never cover each other; lanes are capped responsively (2 on mobile, 3 on desktop).
+  - Excess items are summarized by a compact “+X more” badge with an accessible label.
+- Up Next strip
+  - Shows exactly one next step: either the anchor that spans “now” or the best flexible task for the current window.
+  - Actions are inline: Start, plus a “Can’t do” menu for Skip/Postpone.
+- Visual buffers
+  - Small, faint buffer gradients before/after anchors improve readability without changing data.
+- Smart gap pills
+  - For gaps ≥ 5 minutes (≥ 10 on mobile), a tiny “Use gap” pill appears to jump‑start creation with prefilled time.
+
+Details: see Phase 6 plan `docs/phase-6-action-plan.md`.
+
+### Overdue Policy (Visual Only)
+
+- Mandatory overdue blocks (scheduled start before “now” and not completed/skipped) are visually re‑seated to “now” using a transform and shown in higher‑contrast red.
+- Skippable overdue blocks are de‑emphasized with reduced opacity.
+- This is visual only — no underlying data is mutated; policy applies only on Today.
+- More in `docs/overdue-policy.md`.
+
 ## Tech Stack
 
 - Next.js 15 (App Router), React 19, Tailwind 4

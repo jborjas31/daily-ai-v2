@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Timeline from "@/components/today/Timeline";
 import TaskList from "@/components/today/TaskList";
 import useRequireAuth from "@/components/guards/useRequireAuth";
@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { toastError, toastSuccess } from "@/lib/ui/toast";
 import { toMinutes, todayISO } from "@/lib/time";
 import useNowTick from "@/lib/utils/useNowTick";
+import UpNextStrip from "@/components/today/UpNextStrip";
 
 function useNowMinutes() {
   const [mins, setMins] = useState(() => {
@@ -79,6 +80,41 @@ export default function TodayPage() {
     preloadCachedSchedule(currentDate);
   }, [ready, user, currentDate, loadInstancesForDate, preloadCachedSchedule]);
 
+  // Auto-open modal when a prefill is set (e.g., via gap pill or grid click)
+  useEffect(() => {
+    if (prefill && !modalOpen) setModalOpen(true);
+  }, [prefill, modalOpen]);
+
+  // Mobile swipe safe-zone (header strip) for date navigation
+  const swipeRef = useRef<{ startX: number; startY: number; lastX: number; lastY: number } | null>(null);
+  const SWIPE_THRESHOLD = 40; // px
+  const VERT_TOLERANCE = 24;  // px
+  const onSwipePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    swipeRef.current = { startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastY: e.clientY };
+  };
+  const onSwipePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!swipeRef.current) return;
+    swipeRef.current.lastX = e.clientX;
+    swipeRef.current.lastY = e.clientY;
+  };
+  const onSwipePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const s = swipeRef.current;
+    swipeRef.current = null;
+    if (!s) return;
+    const dx = (s.lastX ?? e.clientX) - s.startX;
+    const dy = (s.lastY ?? e.clientY) - s.startY;
+    if (Math.abs(dy) > Math.max(VERT_TOLERANCE, Math.abs(dx))) return; // vertical or diagonal -> ignore
+    if (dx <= -SWIPE_THRESHOLD) {
+      // Swipe left -> next day
+      setCurrentDate(addDaysISO(currentDate, 1));
+      e.preventDefault();
+    } else if (dx >= SWIPE_THRESHOLD) {
+      // Swipe right -> prev day
+      setCurrentDate(addDaysISO(currentDate, -1));
+      e.preventDefault();
+    }
+  };
+
   if (!ready) {
     return (
       <div className="mx-auto max-w-6xl p-4">
@@ -144,6 +180,43 @@ export default function TodayPage() {
           New Task
         </button>
       </div>
+      {/* Up Next strip */}
+      <UpNextStrip />
+
+      {/* Mobile swipe safe-zone (does not overlap Timeline to avoid drag/scroll conflicts) */}
+      <div
+        role="region"
+        aria-label="Swipe left or right to change date"
+        onPointerDown={onSwipePointerDown}
+        onPointerUp={onSwipePointerUp}
+        onPointerMove={onSwipePointerMove}
+        onTouchStart={(e) => {
+          const t = e.touches && e.touches[0];
+          if (!t) return;
+          swipeRef.current = { startX: t.clientX, startY: t.clientY, lastX: t.clientX, lastY: t.clientY };
+        }}
+        onTouchMove={(e) => {
+          const t = e.touches && e.touches[0];
+          if (!t || !swipeRef.current) return;
+          swipeRef.current.lastX = t.clientX;
+          swipeRef.current.lastY = t.clientY;
+        }}
+        onTouchEnd={() => {
+          const s = swipeRef.current;
+          swipeRef.current = null;
+          if (!s) return;
+          const dx = (s.lastX) - s.startX;
+          const dy = (s.lastY) - s.startY;
+          if (Math.abs(dy) > Math.max(VERT_TOLERANCE, Math.abs(dx))) return;
+          if (dx <= -SWIPE_THRESHOLD) setCurrentDate(addDaysISO(currentDate, 1));
+          else if (dx >= SWIPE_THRESHOLD) setCurrentDate(addDaysISO(currentDate, -1));
+        }}
+        className="md:hidden h-12 -mx-4 px-4 mb-1 touch-pan-y select-none"
+        data-testid="swipe-zone"
+      >
+        <span className="sr-only">Swipe left or right to change date</span>
+      </div>
+
       {/* Status rollup (counts only) */}
       <div className="mb-3 flex flex-wrap gap-2 text-sm">
         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-200 text-emerald-900 dark:bg-emerald-800 dark:text-emerald-100" title="Completed today">

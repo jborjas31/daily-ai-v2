@@ -2,8 +2,10 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import React, { useEffect, useId, useState } from "react";
 import type { TaskTemplate, TimeWindow, TimeString } from "@/lib/types";
+import type { RecurrenceRule } from "@/lib/domain/scheduling/Recurrence";
+import { validateRecurrenceRule } from "@/lib/domain/scheduling/Recurrence";
 import { useAppStore } from "@/store/useAppStore";
-import { validateForm, shouldDisableSubmit } from "./taskModalValidation";
+import { validateForm } from "./taskModalValidation";
 
 type FormState = {
   taskName: string;
@@ -15,6 +17,14 @@ type FormState = {
   durationMinutes: number;
   minDurationMinutes?: number;
   isActive: boolean;
+  // Recurrence (Phase 6 – 12.1 UI)
+  recurrenceFrequency: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+  recurrenceInterval: number;
+  recurrenceDaysOfWeek: number[]; // 0-6 Sun=0
+  recurrenceDayOfMonth?: number;
+  recurrenceMonth?: number; // 1-12
+  recurrenceStartDate?: string; // YYYY-MM-DD
+  recurrenceEndDate?: string;   // YYYY-MM-DD
 };
 
 type FormErrors = Partial<{
@@ -23,6 +33,7 @@ type FormErrors = Partial<{
   defaultTime: string;
   durationMinutes: string;
   minDurationMinutes: string;
+  recurrence: string;
 }>;
 
 const emptyForm: FormState = {
@@ -34,6 +45,13 @@ const emptyForm: FormState = {
   durationMinutes: 30,
   minDurationMinutes: 0,
   isActive: true,
+  recurrenceFrequency: 'none',
+  recurrenceInterval: 1,
+  recurrenceDaysOfWeek: [],
+  recurrenceDayOfMonth: undefined,
+  recurrenceMonth: undefined,
+  recurrenceStartDate: undefined,
+  recurrenceEndDate: undefined,
 };
 
 export default function TaskModal({
@@ -70,6 +88,13 @@ export default function TaskModal({
           durationMinutes: initial.durationMinutes,
           minDurationMinutes: initial.minDurationMinutes ?? 0,
           isActive: initial.isActive,
+          recurrenceFrequency: (((initial.recurrenceRule as RecurrenceRule | undefined)?.frequency) ?? 'none') as FormState['recurrenceFrequency'],
+          recurrenceInterval: (((initial.recurrenceRule as RecurrenceRule | undefined)?.interval) ?? 1),
+          recurrenceDaysOfWeek: (((initial.recurrenceRule as RecurrenceRule | undefined)?.daysOfWeek) ?? []),
+          recurrenceDayOfMonth: ((initial.recurrenceRule as RecurrenceRule | undefined)?.dayOfMonth),
+          recurrenceMonth: ((initial.recurrenceRule as RecurrenceRule | undefined)?.month),
+          recurrenceStartDate: ((initial.recurrenceRule as RecurrenceRule | undefined)?.startDate),
+          recurrenceEndDate: ((initial.recurrenceRule as RecurrenceRule | undefined)?.endDate),
         };
         setForm(f);
       } else {
@@ -97,8 +122,30 @@ export default function TaskModal({
   const isFixed = form.schedulingType === 'fixed';
 
   function validate(current: FormState): { isValid: boolean; errors: FormErrors } {
-    const { isValid, errors } = validateForm(current);
-    return { isValid, errors: errors as FormErrors };
+    const base = validateForm(current);
+    const errors = { ...(base.errors as FormErrors) };
+    let recurrenceOk = true;
+    if (current.recurrenceFrequency && current.recurrenceFrequency !== 'none') {
+      const rule: RecurrenceRule = {
+        frequency: current.recurrenceFrequency,
+        interval: Math.max(1, Number(current.recurrenceInterval) || 1),
+        ...(current.recurrenceFrequency === 'weekly' ? { daysOfWeek: current.recurrenceDaysOfWeek } : {}),
+        ...(current.recurrenceFrequency === 'monthly' || current.recurrenceFrequency === 'yearly' ? { dayOfMonth: current.recurrenceDayOfMonth } : {}),
+        ...(current.recurrenceFrequency === 'yearly' ? { month: current.recurrenceMonth } : {}),
+        ...(current.recurrenceStartDate ? { startDate: current.recurrenceStartDate } : {}),
+        ...(current.recurrenceEndDate ? { endDate: current.recurrenceEndDate } : {}),
+      } as RecurrenceRule;
+      const v = validateRecurrenceRule(rule);
+      if (!v.isValid) {
+        recurrenceOk = false;
+        errors.recurrence = v.errors[0] || 'Invalid recurrence rule';
+      }
+      if (current.recurrenceFrequency === 'weekly' && (!current.recurrenceDaysOfWeek || current.recurrenceDaysOfWeek.length === 0)) {
+        recurrenceOk = false;
+        errors.recurrence = errors.recurrence || 'Select at least one day of week';
+      }
+    }
+    return { isValid: base.isValid && recurrenceOk, errors };
   }
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -116,6 +163,20 @@ export default function TaskModal({
       return;
     }
     setIsSaving(true);
+    // Compose recurrence rule from UI (validation in step 12.2)
+    let recurrenceRule: RecurrenceRule | undefined;
+    if (form.recurrenceFrequency !== 'none') {
+      recurrenceRule = {
+        frequency: form.recurrenceFrequency,
+        interval: Math.max(1, Number(form.recurrenceInterval) || 1),
+        ...(form.recurrenceFrequency === 'weekly' ? { daysOfWeek: form.recurrenceDaysOfWeek } : {}),
+        ...(form.recurrenceFrequency === 'monthly' || form.recurrenceFrequency === 'yearly' ? { dayOfMonth: form.recurrenceDayOfMonth } : {}),
+        ...(form.recurrenceFrequency === 'yearly' ? { month: form.recurrenceMonth } : {}),
+        ...(form.recurrenceStartDate ? { startDate: form.recurrenceStartDate } : {}),
+        ...(form.recurrenceEndDate ? { endDate: form.recurrenceEndDate } : {}),
+      } as RecurrenceRule;
+    }
+
     const base: Omit<TaskTemplate, 'id'> = {
       taskName: form.taskName,
       isMandatory: form.isMandatory,
@@ -129,6 +190,7 @@ export default function TaskModal({
       ...(form.minDurationMinutes !== undefined
         ? { minDurationMinutes: form.minDurationMinutes }
         : {}),
+      ...(recurrenceRule ? { recurrenceRule } : {}),
     };
 
     const toSave: Omit<TaskTemplate, 'id'> | TaskTemplate =
@@ -202,8 +264,124 @@ export default function TaskModal({
                   className="focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
                 />
                 <label htmlFor="isMandatory" className="text-sm">Mandatory</label>
+            </div>
+          </div>
+
+          {/* Recurrence (Phase 6: 12.1 UI) */}
+          <fieldset className="mt-2 border rounded-md p-3" aria-describedby={formErrors.recurrence ? 'recurrence-error' : undefined}>
+            <legend className="px-1 text-sm font-medium">Recurrence</legend>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+              <div>
+                <label htmlFor="recurrenceFrequency" className="block text-sm mb-1">Frequency</label>
+                <select
+                  id="recurrenceFrequency"
+                  value={form.recurrenceFrequency}
+                  onChange={(e)=>update('recurrenceFrequency', e.target.value as FormState['recurrenceFrequency'])}
+                  aria-invalid={!!formErrors.recurrence || undefined}
+                  aria-describedby={formErrors.recurrence ? 'recurrence-error' : undefined}
+                  className="w-full border rounded-md px-2 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                >
+                  <option value="none">None</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="recurrenceInterval" className="block text-sm mb-1">Interval</label>
+                <input
+                  id="recurrenceInterval"
+                  type="number"
+                  min={1}
+                  value={form.recurrenceInterval}
+                  onChange={(e)=>update('recurrenceInterval', Math.max(1, Number(e.target.value) || 1))}
+                  className="w-full border rounded-md px-2 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                />
               </div>
             </div>
+            {form.recurrenceFrequency === 'weekly' ? (
+              <div className="mt-2">
+                <span className="block text-sm mb-1">Days of week</span>
+                <div className="flex flex-wrap gap-2 text-sm" role="group" aria-label="Days of week">
+                  {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((label, idx) => {
+                    const selected = form.recurrenceDaysOfWeek.includes(idx);
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => {
+                          const next = new Set(form.recurrenceDaysOfWeek);
+                          if (next.has(idx)) next.delete(idx); else next.add(idx);
+                          update('recurrenceDaysOfWeek', Array.from(next).sort((a,b)=>a-b));
+                        }}
+                        className={`px-2 py-1 rounded-md border ${selected ? 'bg-blue-600 text-white border-blue-700' : 'bg-slate-200 dark:bg-slate-700 border-transparent'}`}
+                        aria-label={label}
+                      >{label}</button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+            {(form.recurrenceFrequency === 'monthly' || form.recurrenceFrequency === 'yearly') ? (
+              <div className="mt-2 grid grid-cols-2 gap-3">
+                {form.recurrenceFrequency === 'yearly' ? (
+                  <div>
+                    <label htmlFor="recurrenceMonth" className="block text-sm mb-1">Month</label>
+                    <select
+                      id="recurrenceMonth"
+                      value={form.recurrenceMonth || ''}
+                      onChange={(e)=>update('recurrenceMonth', Number(e.target.value) || undefined)}
+                      className="w-full border rounded-md px-2 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    >
+                      <option value="">—</option>
+                      {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m, i) => (
+                        <option key={m} value={i+1}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+                <div>
+                  <label htmlFor="recurrenceDayOfMonth" className="block text-sm mb-1">Day of month</label>
+                  <input
+                    id="recurrenceDayOfMonth"
+                    type="number"
+                    min={1}
+                    max={31}
+                    value={form.recurrenceDayOfMonth || 1}
+                    onChange={(e)=>update('recurrenceDayOfMonth', Math.min(31, Math.max(1, Number(e.target.value) || 1)))}
+                    className="w-full border rounded-md px-2 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  />
+                </div>
+              </div>
+            ) : null}
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="recurrenceStartDate" className="block text-sm mb-1">Start date</label>
+                <input
+                  id="recurrenceStartDate"
+                  type="date"
+                  value={form.recurrenceStartDate || ''}
+                  onChange={(e)=>update('recurrenceStartDate', e.target.value || undefined)}
+                  className="w-full border rounded-md px-2 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label htmlFor="recurrenceEndDate" className="block text-sm mb-1">End date</label>
+                <input
+                  id="recurrenceEndDate"
+                  type="date"
+                  value={form.recurrenceEndDate || ''}
+                  onChange={(e)=>update('recurrenceEndDate', e.target.value || undefined)}
+                  className="w-full border rounded-md px-2 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                />
+              </div>
+            </div>
+            {formErrors.recurrence && (
+              <p id="recurrence-error" className="mt-2 text-xs text-rose-600">{formErrors.recurrence}</p>
+            )}
+          </fieldset>
 
             <div>
               <label className="block text-sm mb-1">Scheduling</label>
@@ -323,7 +501,7 @@ export default function TaskModal({
               </Dialog.Close>
               <button
                 type="submit"
-                disabled={shouldDisableSubmit(form, isSaving)}
+                disabled={isSaving || !validate(form).isValid}
                 aria-busy={isSaving || undefined}
                 className="px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
               >

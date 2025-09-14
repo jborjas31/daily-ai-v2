@@ -11,5 +11,10 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     environmentMatchGlobs: [["**/*.test.tsx", "jsdom"]],
+    // Stabilize in constrained environments (e.g., Node 18 in CI/CLI sandboxes)
+    pool: 'threads',
+    poolOptions: {
+      threads: { singleThread: true },
+    },
   },
 });

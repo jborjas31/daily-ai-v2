@@ -23,6 +23,8 @@ export interface TaskTemplate {
   minDurationMinutes?: number;
   dependsOn?: string; // templateId
   recurrenceRule?: unknown;
+  // Optional small visual buffer (minutes) around anchors on timeline
+  bufferMinutes?: number;
   // Optional metadata: last updated time (server timestamp/epoch)
   updatedAt?: unknown;
 }

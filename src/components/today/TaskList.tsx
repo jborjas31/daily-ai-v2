@@ -9,7 +9,8 @@ export default function TaskList() {
   const date = useAppStore((s: AppState) => s.ui.currentDate);
   const templates = useAppStore((s: AppState) => s.templates);
   const schedule = useAppStore((s: AppState) => s.generateScheduleForDate(s.ui.currentDate));
-  const instances = useAppStore((s: AppState) => s.getTaskInstancesForDate(s.ui.currentDate));
+  // Subscribe directly to instances for the current date to ensure UI updates reliably
+  const instances = useAppStore((s: AppState) => s.instancesByDate[s.ui.currentDate] ?? []);
   const toggleComplete = useAppStore((s: AppState) => s.toggleComplete);
   const skipInstance = useAppStore((s: AppState) => s.skipInstance);
   const postponeInstance = useAppStore((s: AppState) => s.postponeInstance);

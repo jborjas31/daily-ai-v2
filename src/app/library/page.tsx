@@ -123,6 +123,31 @@ export default function LibraryPage() {
     return withTs.slice(0, 5).map((x) => x.t);
   }, [templates]);
 
+  function recurrenceSummary(rule: RecurrenceRule | undefined): string | null {
+    if (!rule || rule.frequency === 'none') return null;
+    const parts: string[] = [];
+    switch (rule.frequency) {
+      case 'daily':
+        parts.push(`Daily${(rule.interval && rule.interval > 1) ? ` · every ${rule.interval} days` : ''}`);
+        break;
+      case 'weekly': {
+        const days = (rule.daysOfWeek ?? []).map((d) => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d]).join('/');
+        parts.push(`Weekly${(rule.interval && rule.interval > 1) ? ` · every ${rule.interval} weeks` : ''}${days ? ` · ${days}` : ''}`);
+        break;
+      }
+      case 'monthly':
+        parts.push(`Monthly${(rule.interval && rule.interval > 1) ? ` · every ${rule.interval} months` : ''}${rule.dayOfMonth ? ` · day ${rule.dayOfMonth}` : ''}`);
+        break;
+      case 'yearly':
+        parts.push(`Yearly${(rule.interval && rule.interval > 1) ? ` · every ${rule.interval} years` : ''}${rule.month ? ` · ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Math.max(1, rule.month)-1]}` : ''}${rule.dayOfMonth ? ` ${rule.dayOfMonth}` : ''}`);
+        break;
+      default:
+        break;
+    }
+    if (rule.endDate) parts.push(`Ends ${rule.endDate}`);
+    return parts.join(' ');
+  }
+
   if (!ready) {
     return (
       <div className="mx-auto max-w-6xl p-4">
@@ -466,6 +491,11 @@ export default function LibraryPage() {
                       <div>
                         <div className="font-medium">{t.taskName}</div>
                         <div className="text-sm text-black/60 dark:text-white/60">{t.schedulingType === 'fixed' ? `Fixed @ ${t.defaultTime}` : `Flexible (${t.timeWindow})`} • {t.durationMinutes}m</div>
+                        {recurrenceSummary(t.recurrenceRule as RecurrenceRule | undefined) ? (
+                          <div className="text-xs text-black/60 dark:text-white/60 mt-0.5">
+                            {recurrenceSummary(t.recurrenceRule as RecurrenceRule | undefined)}
+                          </div>
+                        ) : null}
                         {dep ? (
                           <div className="mt-1">
                             <span
@@ -522,6 +552,11 @@ export default function LibraryPage() {
                       <div>
                         <div className="font-medium">{t.taskName}</div>
                         <div className="text-sm text-black/60 dark:text-white/60">{t.schedulingType === 'fixed' ? `Fixed @ ${t.defaultTime}` : `Flexible (${t.timeWindow})`} • {t.durationMinutes}m</div>
+                        {recurrenceSummary(t.recurrenceRule as RecurrenceRule | undefined) ? (
+                          <div className="text-xs text-black/60 dark:text-white/60 mt-0.5">
+                            {recurrenceSummary(t.recurrenceRule as RecurrenceRule | undefined)}
+                          </div>
+                        ) : null}
                         {dep ? (
                           <div className="mt-1">
                             <span

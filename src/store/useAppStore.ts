@@ -7,6 +7,9 @@ import type { Settings, TaskTemplate, TaskInstance, ScheduleResult, TimeWindow, 
 import { generateSchedule } from "@/lib/domain/scheduling/SchedulingEngine";
 import { listInstancesByDate, upsertInstance, deleteInstance, instanceIdFor } from "@/lib/data/instances";
 import { getCachedSchedule, putCachedSchedule } from "@/lib/data/schedules";
+import { todayISO as localTodayISO } from "@/lib/time";
+import { shouldGenerateForDate, type RecurrenceRule } from "@/lib/domain/scheduling/Recurrence";
+import { toMinutes } from "@/lib/time";
 
 type SortMode = 'name' | 'priority';
 type MandatoryFilter = 'all' | 'mandatory' | 'skippable';
@@ -69,11 +72,13 @@ type AppState = {
   getTemplateById: (id: string) => TaskTemplate | undefined;
   generateScheduleForDate: (date: string) => ScheduleResult;
   getNewTaskPrefill: () => UiState['newTaskPrefill'];
+  // Phase 6 — Up Next (5.1)
+  computeUpNext: (date: string, nowTime?: TimeString) => UpNextSuggestion;
 };
 
+// Use local-time aware today ISO for UI defaults
 function todayISO() {
-  const d = new Date();
-  return d.toISOString().slice(0, 10);
+  return localTodayISO();
 }
 
 const defaultSettings: Settings = {
@@ -463,9 +468,167 @@ export const useAppStore = create<AppState>()(
       getNewTaskPrefill() {
         return get().ui.newTaskPrefill;
       },
+      // Phase 6 — 5.1 Compute "Up Next"
+      computeUpNext(date, nowTime) {
+        const s = get();
+        const settings = s.settings ?? defaultSettings;
+        const templates = s.templates;
+        const instances = s.instancesByDate[date] ?? [];
+        // Compute schedule locally to avoid mutating store during render
+        const scheduleRes = generateSchedule({
+          settings: s.settings ?? defaultSettings,
+          templates: s.templates,
+          instances: s.instancesByDate[date] ?? [],
+          date,
+        });
+
+        // If schedule failed or no templates, bail out
+        if (!scheduleRes.success || templates.length === 0) return { kind: 'none' } as UpNextSuggestion;
+
+        const now = nowTime ?? (() => {
+          const d = new Date();
+          const hh = String(d.getHours()).padStart(2, '0');
+          const mm = String(d.getMinutes()).padStart(2, '0');
+          return `${hh}:${mm}` as TimeString;
+        })();
+        const nowMin = toMinutes(now);
+
+        // Awake bounds
+        const wakeMin = toMinutes(settings.defaultWakeTime);
+        const sleepMin = toMinutes(settings.defaultSleepTime);
+        const isAwakeNow = nowMin >= wakeMin && nowMin < sleepMin;
+        if (!isAwakeNow) return { kind: 'none' } as UpNextSuggestion;
+
+        // Helper maps
+        const tmplById = new Map(templates.map(t => [t.id, t] as const));
+        const instByTmpl = new Map(instances.map(i => [i.templateId, i] as const));
+        const completedSet = new Set(instances.filter(i => i.status === 'completed').map(i => i.templateId));
+        const excludedSet = new Set(instances.filter(i => i.status === 'completed' || i.status === 'skipped' || i.status === 'postponed').map(i => i.templateId));
+        const blockById = new Map(scheduleRes.schedule.map(b => [b.templateId, b] as const));
+
+        // Determine if a block is an anchor (fixed or manual override)
+        const isAnchorBlock = (templateId: string, startTime: TimeString): { anchor: boolean; reason?: 'fixed' | 'override' } => {
+          const t = tmplById.get(templateId);
+          if (!t) return { anchor: false };
+          if (t.schedulingType === 'fixed') return { anchor: true, reason: 'fixed' };
+          const inst = instByTmpl.get(templateId);
+          if (inst?.modifiedStartTime && inst.modifiedStartTime === startTime) return { anchor: true, reason: 'override' };
+          return { anchor: false };
+        };
+
+        // 1) If an anchor is active now, return it
+        for (const b of scheduleRes.schedule) {
+          const start = toMinutes(b.startTime);
+          const end = toMinutes(b.endTime);
+          if (nowMin >= start && nowMin < end) {
+            const a = isAnchorBlock(b.templateId, b.startTime as TimeString);
+            if (a.anchor) {
+              const t = tmplById.get(b.templateId)!;
+              return { kind: 'anchor', template: t, block: { startTime: b.startTime, endTime: b.endTime }, reason: a.reason } as UpNextSuggestion;
+            }
+          }
+        }
+
+        // 2) Otherwise choose best flexible for now (highest priority in current window, not blocked)
+        const winMorning = { start: Math.max(wakeMin, toMinutes('06:00' as TimeString)), end: Math.min(sleepMin, toMinutes('12:00' as TimeString)) };
+        const winAfternoon = { start: Math.max(wakeMin, toMinutes('12:00' as TimeString)), end: Math.min(sleepMin, toMinutes('18:00' as TimeString)) };
+        const winEvening = { start: Math.max(wakeMin, toMinutes('18:00' as TimeString)), end: Math.min(sleepMin, toMinutes('23:00' as TimeString)) };
+        const winAny = { start: Math.max(wakeMin, toMinutes('06:00' as TimeString)), end: Math.min(sleepMin, toMinutes('23:00' as TimeString)) };
+
+        let nowWindow: TimeWindow = 'anytime';
+        if (nowMin >= winMorning.start && nowMin < winMorning.end) nowWindow = 'morning';
+        else if (nowMin >= winAfternoon.start && nowMin < winAfternoon.end) nowWindow = 'afternoon';
+        else if (nowMin >= winEvening.start && nowMin < winEvening.end) nowWindow = 'evening';
+        else if (!(nowMin >= winAny.start && nowMin < winAny.end)) {
+          // Outside suggested windows
+          return { kind: 'none' } as UpNextSuggestion;
+        }
+
+        const occursToday = (t: TaskTemplate) => shouldGenerateForDate((t.recurrenceRule ?? { frequency: 'none' }) as RecurrenceRule, date);
+
+        const depSatisfied = (t: TaskTemplate): boolean => {
+          if (!t.dependsOn) return true;
+          if (completedSet.has(t.dependsOn)) return true;
+          const depBlock = blockById.get(t.dependsOn);
+          if (!depBlock) return false;
+          const depEnd = toMinutes(depBlock.endTime as TimeString);
+          return depEnd <= nowMin;
+        };
+
+        const hasFutureManualAnchor = (t: TaskTemplate): boolean => {
+          const inst = instByTmpl.get(t.id);
+          if (!inst?.modifiedStartTime) return false;
+          const start = toMinutes(inst.modifiedStartTime as TimeString);
+          return start > nowMin; // anchored in future, avoid suggesting now
+        };
+
+        // Remaining time in current window; prefer tasks that fit, then shortest duration when time is tight
+        const winRange = nowWindow === 'morning' ? winMorning : nowWindow === 'afternoon' ? winAfternoon : nowWindow === 'evening' ? winEvening : winAny;
+        const remaining = Math.max(0, winRange.end - nowMin);
+
+        const candidates = templates
+          .filter(t => (t.isActive !== false))
+          .filter(t => occursToday(t))
+          .filter(t => t.schedulingType !== 'fixed')
+          .filter(t => !excludedSet.has(t.id)) // exclude completed/skipped/postponed for today
+          .filter(t => depSatisfied(t)) // dependency-ready only
+          .filter(t => !hasFutureManualAnchor(t))
+          .filter(t => {
+            const win = t.timeWindow ?? 'anytime';
+            return win === 'anytime' || win === nowWindow;
+          });
+
+        const anyFits = candidates.some(t => (t.durationMinutes || 0) <= remaining);
+
+        const sorted = candidates.slice().sort((a, b) => {
+          // 1) Priority ↓
+          const pa = a.priority || 0;
+          const pb = b.priority || 0;
+          if (pb !== pa) return pb - pa;
+          // 2) Prefer those that fit in the remaining window
+          const fitsA = (a.durationMinutes || 0) <= remaining ? 1 : 0;
+          const fitsB = (b.durationMinutes || 0) <= remaining ? 1 : 0;
+          if (fitsA !== fitsB) return fitsB - fitsA;
+          // 3) Shortest duration when time is tight
+          if (anyFits) {
+            if (fitsA === 1 && fitsB === 1) {
+              const da = a.durationMinutes || 0;
+              const db = b.durationMinutes || 0;
+              if (da !== db) return da - db;
+            }
+          } else {
+            // No candidates fit: prefer shorter to make progress
+            const da = a.durationMinutes || 0;
+            const db = b.durationMinutes || 0;
+            if (da !== db) return da - db;
+          }
+          // 4) Earliest fit within current window (based on scheduled block start)
+          const ba = blockById.get(a.id);
+          const bb = blockById.get(b.id);
+          const sa = ba ? toMinutes(ba.startTime as TimeString) : Number.POSITIVE_INFINITY;
+          const sb = bb ? toMinutes(bb.startTime as TimeString) : Number.POSITIVE_INFINITY;
+          const nextA = sa >= nowMin ? sa : Number.POSITIVE_INFINITY;
+          const nextB = sb >= nowMin ? sb : Number.POSITIVE_INFINITY;
+          if (nextA !== nextB) return nextA - nextB;
+          // 5) Deterministic fallback by name then id
+          const nameCmp = (a.taskName || '').localeCompare(b.taskName || '');
+          if (nameCmp !== 0) return nameCmp;
+          return (a.id || '').localeCompare(b.id || '');
+        });
+
+        const top = sorted[0];
+        if (!top) return { kind: 'none' } as UpNextSuggestion;
+        return { kind: 'flexible', template: top, window: nowWindow } as UpNextSuggestion;
+      },
     })),
     { name: 'AppStore' }
   )
 );
 
 export type { AppState };
+
+// Up Next output shape
+export type UpNextSuggestion =
+  | { kind: 'none' }
+  | { kind: 'anchor'; template: TaskTemplate; block: { startTime: TimeString; endTime: TimeString }; reason?: 'fixed' | 'override' }
+  | { kind: 'flexible'; template: TaskTemplate; window: TimeWindow };

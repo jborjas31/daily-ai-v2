@@ -191,7 +191,7 @@ Phase 6 — Real‑Time, Date Nav & Overlaps
   - Prev/Next (and swipe) update `currentDate` and re-render Timeline/List immediately; now‑line shown only on today.
   - Selecting a date via native date input updates `currentDate` and re-renders Timeline/List; keyboard accessible and respects locale.
   - Mandatory overdue blocks render in red tint and visually re-seat at current time (no data mutation); skippable overdue render grayed.
-  - Overlapping blocks never cover; excess beyond lane capacity shows “+X more” (tap/click may list hidden items).
+ - Overlapping blocks never cover; excess beyond lane capacity shows “+X more” (tap/click may list hidden items).
  - Up Next strip (calm focus):
    - Shows exactly one next step: current anchor or best flexible task for “now”.
    - Two actions: Start; Can’t do → inline Skip/Postpone (no modal).
@@ -199,6 +199,15 @@ Phase 6 — Real‑Time, Date Nav & Overlaps
    - Default 5–10 min transition before/after anchors (faint visual spacing); per‑task override via `bufferMinutes`.
  - Smart gaps (quiet micro‑fillers):
    - In gaps ≥ 5 min, show a tiny “Use gap” pill in the gap; tap to fill with a short task. No global suggestions.
+ - Library — Recurrence Editor (concurrent):
+   - Expose recurrence fields in the Task modal: frequency (none/daily/weekly/monthly/yearly), interval, daysOfWeek (weekly), dayOfMonth/month (monthly/yearly), startDate, endDate.
+   - Validation: use `validateRecurrenceRule`; inline errors; disable Save while invalid.
+   - Series scope: keep `ScopeDialog` for “Only this / This and future / All” edits; “future” splits via date fences.
+   - Library list: show a compact summary (e.g., “Weekly · Mon/Fri”, “Daily · every 2 days”, “Ends 2025‑06‑30”).
+   - Acceptance:
+     - User can create/edit recurring tasks with intervals and date fences.
+     - Scheduler respects occurrences for the selected date (engine already supports this).
+     - Recurrence‑affecting edits trigger Scope dialog; “Only this” supports time change for fixed tasks and optional per‑date status override.
 
 Phase 7 — Offline Enhancements (beyond Firestore persistence)
 - Optional write queue wrapper for user‑visible syncing states and retry/backoff; conflict toast with “retry/undo”.
