@@ -86,8 +86,13 @@ export default function Timeline() {
     };
   }, []);
 
-  // Mobile scale: enlarge to 2x container-fit; desktop uses fixed scale
+  // Mobile scale: enlarge to 2x based on viewport; desktop uses fixed scale
   useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) {
+      // In SSR/tests, keep default for stability (e.g., UI tests expect 64px/hr)
+      setRowHeight(BASE_ROW_HEIGHT);
+      return;
+    }
     const el = containerRef.current;
     if (!el) return;
     const isDesktop = laneCap >= 3;
@@ -96,10 +101,11 @@ export default function Timeline() {
       return;
     }
     const compute = () => {
-      const h = el.clientHeight || 0;
-      if (h > 0) {
-        // Double the per-hour size relative to fit-to-container
-        const target = Math.max(8, Math.floor(h / 24) * 2); // min 8px/hour baseline
+      const vh = window.innerHeight || 0;
+      if (vh > 0) {
+        // Base on ~80% of viewport height, then double
+        const base = Math.floor((vh * 0.8) / 24);
+        const target = Math.max(8, base * 2); // min 8px/hour baseline
         setRowHeight(target);
       } else {
         // Fallback if no layout info in env (e.g., tests/SSR)
@@ -107,18 +113,12 @@ export default function Timeline() {
       }
     };
     compute();
-    let ro: ResizeObserver | null = null;
-    try {
-      // Recompute when the container resizes (orientation/viewport changes)
-      ro = new ResizeObserver(() => compute());
-      ro.observe(el);
-    } catch {
-      // Older environments: listen to window resize
-      window.addEventListener('resize', compute);
-    }
+    // Recompute on viewport size/orientation changes
+    window.addEventListener('resize', compute);
+    window.addEventListener('orientationchange', compute);
     return () => {
-      if (ro) ro.disconnect();
-      else window.removeEventListener('resize', compute);
+      window.removeEventListener('resize', compute);
+      window.removeEventListener('orientationchange', compute);
     };
   }, [laneCap]);
 
@@ -141,11 +141,13 @@ export default function Timeline() {
     setNewTaskPrefill({ time: startStr, window: win });
   }
 
-  // Auto-scroll to now when viewing today (initially and on date/now changes)
+  // Auto-scroll to now when viewing today (desktop only; mobile is non-scrolling)
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     if (currentDate !== todayISO()) return;
+    const isDesktop = laneCap >= 3;
+    if (!isDesktop) return;
     const y = minutesToY(nowMins, rowHeight) - el.clientHeight / 2;
     const top = Math.max(0, y);
     const maybeScroll = el as Element & { scrollTo?: (options: ScrollToOptions) => void };
@@ -154,7 +156,7 @@ export default function Timeline() {
     } else {
       (el as HTMLDivElement).scrollTop = top;
     }
-  }, [currentDate, nowMins, rowHeight]);
+  }, [currentDate, nowMins, rowHeight, laneCap]);
 
   const instMap = useMemo(() => new Map(instances.map((i) => [i.templateId, i])), [instances]);
   const isToday = currentDate === todayISO();
@@ -358,7 +360,7 @@ export default function Timeline() {
 
   return (
     <div
-      className="relative border rounded-lg overflow-y-auto h-[80svh] overscroll-contain touch-pan-y"
+      className="relative border rounded-lg overflow-y-visible md:overflow-y-auto md:h-[80svh] overscroll-contain touch-pan-y"
       ref={(el) => { containerRef.current = el; containerRefForOutside.current = el; }}
       data-testid="timeline"
     >
