@@ -202,7 +202,7 @@ export default function Timeline() {
         done,
       };
     });
-  }, [scheduleRes.schedule, templates, instMap]);
+  }, [scheduleRes.schedule, templates, instMap, rowHeight]);
 
   const blocks = useMemo(() => {
     const now = nowMins;
@@ -223,7 +223,7 @@ export default function Timeline() {
       const overdueKind = (isOverdue ? (b.isMandatory ? 'mandatory' : 'skippable') : 'no') as OverdueKind;
       return { ...b, bg, border, extra, transformY, overdueKind };
     });
-  }, [baseBlocks, nowMins, isToday]);
+  }, [baseBlocks, nowMins, isToday, rowHeight]);
 
   // Build buffer overlays (visual only) for anchors (fixed or manual override)
   const bufferOverlays: { top: number; height: number; key: string; kind: 'before' | 'after'; id: string }[] = [];

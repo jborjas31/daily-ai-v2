@@ -3,10 +3,10 @@ import { useMemo } from "react";
 import useNowTick from "@/lib/utils/useNowTick";
 import { useAuth } from "@/components/providers/FirebaseClientProvider";
 
-function formatToday() {
-  const now = new Date();
+function formatToday(dateISO?: string) {
+  const d = dateISO ? new Date(`${dateISO}T00:00:00`) : new Date();
   // Local device time only
-  return now.toLocaleDateString(undefined, {
+  return d.toLocaleDateString(undefined, {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -17,7 +17,7 @@ function formatToday() {
 export default function AppHeader() {
   const { user, loading, signOut } = useAuth();
   const { nowISO } = useNowTick(60_000);
-  const today = useMemo(() => formatToday(), [nowISO]);
+  const today = useMemo(() => formatToday(nowISO), [nowISO]);
 
   return (
     <header className="w-full border-b border-black/10 dark:border-white/15 bg-white/70 dark:bg-black/30 backdrop-blur supports-[backdrop-filter]:bg-white/50 sticky top-0 z-40">

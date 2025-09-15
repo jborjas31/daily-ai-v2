@@ -1,6 +1,6 @@
 // Pure recurrence utilities for task templates
 // No global state; operates on provided rule + dates only
-import type { RecurrenceRule, RecurrenceFrequency, CustomPattern } from '@/lib/types';
+import type { RecurrenceRule, RecurrenceFrequency } from '@/lib/types';
 
 function toDate(d: string | Date): Date {
   if (d instanceof Date) {
