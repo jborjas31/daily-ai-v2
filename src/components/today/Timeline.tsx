@@ -360,7 +360,7 @@ export default function Timeline() {
 
   return (
     <div
-      className="relative border rounded-lg overflow-y-visible md:overflow-y-auto md:h-[80svh] overscroll-contain touch-pan-y"
+      className="relative border rounded-lg overflow-y-auto h-[80svh] overscroll-contain touch-pan-y"
       ref={(el) => { containerRef.current = el; containerRefForOutside.current = el; }}
       data-testid="timeline"
     >
@@ -570,8 +570,8 @@ function TimelineBlock({ block: b, prefersReducedMotion, nowTime, rowHeight }: {
     timer: number | null;
   }>({ active: false, started: false, startX: 0, startY: 0, pointerId: null, pointerType: null, timer: null });
 
-  const DRAG_START_Y = 8; // px movement required to start drag ("give")
-  const TOUCH_LONG_PRESS_MS = 180; // slight hold on touch before drag
+  const DRAG_START_Y = 24; // px movement required to start drag (more tolerance for scroll)
+  const TOUCH_LONG_PRESS_MS = 350; // longer hold on touch before drag
 
   const clearWatchers = () => {
     const s = stateRef.current;
@@ -691,9 +691,9 @@ function TimelineBlock({ block: b, prefersReducedMotion, nowTime, rowHeight }: {
   return (
     <motion.div
       ref={rootRef}
-      className={`group absolute ${b.bg} ${b.border} border rounded-md text-[12px] text-white shadow-sm p-2 ${b.draggable ? 'cursor-grab active:cursor-grabbing' : ''} ${b.extra || ''} focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
+      className={`group absolute ${b.bg} ${b.border} border rounded-md text-[12px] text-white shadow-sm p-2 ${b.draggable ? 'cursor-grab active:cursor-grabbing' : ''} ${b.extra || ''} focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 touch-pan-y`}
       tabIndex={isOverdue ? 0 : undefined}
-      style={{ top: b.top, height: b.height, left: leftCalc, width: laneW, transform: `translateY(${b.transformY || 0}px)` }}
+      style={{ top: b.top, height: b.height, left: leftCalc, width: laneW, transform: `translateY(${b.transformY || 0}px)`, touchAction: 'pan-y' }}
       transition={prefersReducedMotion ? { duration: 0 } : { type: 'tween', duration: 0.2, ease: 'easeOut' }}
       data-overdue={b.overdueKind}
       data-testid="timeline-block"
@@ -726,7 +726,7 @@ function TimelineBlock({ block: b, prefersReducedMotion, nowTime, rowHeight }: {
         <div
           className={`absolute right-1 bottom-1 inline-flex gap-1 ${
             prefersReducedMotion ? '' : 'transition-opacity duration-150'
-          } opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 pointer-events-none group-hover:pointer-events-auto group-focus-visible:pointer-events-auto`}
+          } pointer-events-auto md:pointer-events-none md:opacity-0 md:group-hover:opacity-100 md:group-focus-visible:opacity-100 md:group-hover:pointer-events-auto md:group-focus-visible:pointer-events-auto`}
           role="group"
           aria-label="Overdue actions"
         >
