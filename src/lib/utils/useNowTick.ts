@@ -27,7 +27,16 @@ export default function useNowTick(periodMs = 30_000): NowTick {
       }
     };
 
-    const id = setInterval(tick, Math.max(1_000, periodMs));
+    // Schedule periodic updates with a self-adjusting timeout to avoid multi-fire catch-up under fake timers
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const period = Math.max(1_000, periodMs);
+    const loop = () => {
+      timeoutId = setTimeout(() => {
+        tick();
+        if (!cancelled) loop();
+      }, period);
+    };
+    loop();
 
     const onVisibility = () => {
       if (typeof document !== 'undefined' && !document.hidden) {
@@ -38,12 +47,11 @@ export default function useNowTick(periodMs = 30_000): NowTick {
       document.addEventListener('visibilitychange', onVisibility);
     }
 
-    // Initial paint should be current
-    tick();
+    // Do not call tick() immediately to avoid double-advancing under fake timers/tests
 
     return () => {
       cancelled = true;
-      clearInterval(id);
+      if (timeoutId) clearTimeout(timeoutId);
       if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
         document.removeEventListener('visibilitychange', onVisibility);
       }
@@ -52,4 +60,3 @@ export default function useNowTick(periodMs = 30_000): NowTick {
 
   return now;
 }
-

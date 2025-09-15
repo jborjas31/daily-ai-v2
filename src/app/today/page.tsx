@@ -61,6 +61,8 @@ export default function TodayPage() {
     preloadCachedSchedule(currentDate);
   }, [ready, user, currentDate, loadInstancesForDate, preloadCachedSchedule]);
 
+  // Note: do not force-reset currentDate here; tests may intentionally set non-today dates
+
   // Ensure templates are loaded on Today so task names render (not just IDs)
   useEffect(() => {
     if (!ready || !user) return;

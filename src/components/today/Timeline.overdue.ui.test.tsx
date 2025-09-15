@@ -112,7 +112,8 @@ describe('Timeline overdue visuals', () => {
     const { default: TodayPage } = await import('@/app/today/page');
     render(<TodayPage />);
     const timeline = screen.getAllByTestId('timeline').at(-1)!;
-    expect(within(timeline).queryByLabelText('Now line')).not.toBeInTheDocument();
+    // Ensure Now line is evaluated within the timeline container
+    expect(within(timeline).queryByLabelText('Now line')).toBeNull();
     const blocks = within(timeline).getAllByTestId('timeline-block');
     for (const el of blocks) {
       expect(el).toHaveAttribute('data-overdue', 'no');
