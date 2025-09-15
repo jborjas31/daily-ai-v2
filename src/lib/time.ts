@@ -1,4 +1,5 @@
-export type TimeString = string;
+import type { TimeString } from '@/lib/types';
+export type { TimeString };
 
 export function parseHHMM(t: TimeString): { h: number; m: number } {
   const [h, m] = t.split(":").map((n) => parseInt(n, 10));
@@ -44,4 +45,18 @@ export function nowTimeString(): TimeString {
   const hh = String(d.getHours()).padStart(2, '0');
   const mm = String(d.getMinutes()).padStart(2, '0');
   return `${hh}:${mm}` as TimeString;
+}
+
+// Add or subtract whole days from a local-date ISO (YYYY-MM-DD)
+export function addDaysISO(dateISO: string, delta: number): string {
+  const [yStr, mStr, dStr] = dateISO.split('-');
+  const y = Number(yStr) || 0;
+  const m = (Number(mStr) || 1) - 1; // 0-based month
+  const d = Number(dStr) || 1;
+  const date = new Date(y, m, d);
+  date.setDate(date.getDate() + delta);
+  const yy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
 }

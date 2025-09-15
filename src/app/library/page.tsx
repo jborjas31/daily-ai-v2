@@ -5,7 +5,7 @@ import { useAppStore } from "@/store/useAppStore";
 import type { AppState } from "@/store/useAppStore";
 import type { TaskTemplate } from "@/lib/types";
 import { listTemplates, updateTemplate, duplicateTemplate, softDeleteTemplate, createTemplate } from "@/lib/data/templates";
-import type { RecurrenceRule } from "@/lib/domain/scheduling/Recurrence";
+import type { RecurrenceRule } from "@/lib/types";
 import { formatDate } from "@/lib/domain/scheduling/Recurrence";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import ScopeDialog, { type EditScope } from "@/components/ui/ScopeDialog";
@@ -55,7 +55,7 @@ export default function LibraryPage() {
 
   function isRecurringTemplate(t: TaskTemplate | null | undefined): boolean {
     if (!t) return false;
-    const freq = ((t.recurrenceRule as unknown as RecurrenceRule | undefined)?.frequency) ?? 'none';
+    const freq = t.recurrenceRule?.frequency ?? 'none';
     return freq !== 'none';
   }
 

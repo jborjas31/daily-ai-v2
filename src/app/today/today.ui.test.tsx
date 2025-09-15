@@ -46,10 +46,10 @@ describe('Today header — live clock, date navigation, now-line visibility', ()
     const clock = screen.getByLabelText('Current time');
     expect(clock).toHaveTextContent('10:00');
 
-    // Advance one minute of system time; tick interval is 30s
+    // Advance one minute of system time; tick interval is 60s
     vi.setSystemTime(new Date(base.getTime() + 60_000));
     act(() => {
-      vi.advanceTimersByTime(30_000);
+      vi.advanceTimersByTime(60_000);
     });
     expect(clock).toHaveTextContent('10:01');
     vi.useRealTimers();

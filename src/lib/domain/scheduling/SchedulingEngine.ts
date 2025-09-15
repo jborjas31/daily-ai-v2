@@ -1,4 +1,5 @@
-import { shouldGenerateForDate, type RecurrenceRule } from "./Recurrence";
+import { shouldGenerateForDate } from "./Recurrence";
+import type { RecurrenceRule } from "@/lib/types";
 import { toMinutes, fromMinutes } from "@/lib/time";
 import type { Settings, TaskTemplate, TaskInstance, ScheduleBlock, ScheduleResult, TimeString } from "@/lib/types";
 

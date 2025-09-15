@@ -9,7 +9,7 @@ export default function UpNextStrip() {
   const setInstanceStartTime = useAppStore((s) => s.setInstanceStartTime);
   const skipInstance = useAppStore((s) => s.skipInstance);
   const postponeInstance = useAppStore((s) => s.postponeInstance);
-  const { nowTime } = useNowTick(30_000);
+  const { nowTime } = useNowTick(60_000);
 
   const suggestion: UpNextSuggestion = useMemo(() => computeUpNext(currentDate, nowTime), [computeUpNext, currentDate, nowTime]);
 

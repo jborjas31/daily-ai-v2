@@ -8,7 +8,8 @@ import { generateSchedule } from "@/lib/domain/scheduling/SchedulingEngine";
 import { listInstancesByDate, upsertInstance, deleteInstance, instanceIdFor } from "@/lib/data/instances";
 import { getCachedSchedule, putCachedSchedule } from "@/lib/data/schedules";
 import { todayISO as localTodayISO } from "@/lib/time";
-import { shouldGenerateForDate, type RecurrenceRule } from "@/lib/domain/scheduling/Recurrence";
+import { shouldGenerateForDate } from "@/lib/domain/scheduling/Recurrence";
+import type { RecurrenceRule } from "@/lib/types";
 import { toMinutes } from "@/lib/time";
 
 type SortMode = 'name' | 'priority';

@@ -1,29 +1,6 @@
 // Pure recurrence utilities for task templates
 // No global state; operates on provided rule + dates only
-
-export type RecurrenceFrequency = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
-
-export type CustomPattern =
-  | { type: 'weekdays' }
-  | { type: 'weekends' }
-  | { type: 'nth_weekday'; dayOfWeek: number; nthWeek: number }
-  | { type: 'last_weekday'; dayOfWeek: number }
-  | { type: 'business_days' };
-
-export interface RecurrenceRule {
-  frequency: RecurrenceFrequency;
-  interval?: number; // >=1
-  startDate?: string; // YYYY-MM-DD
-  endDate?: string;   // YYYY-MM-DD
-  endAfterOccurrences?: number;
-  // weekly
-  daysOfWeek?: number[]; // 0-6 (Sun=0)
-  // monthly/yearly
-  dayOfMonth?: number; // 1-31 or -1 for last day of month
-  month?: number; // 1-12 (for yearly)
-  // custom
-  customPattern?: CustomPattern;
-}
+import type { RecurrenceRule, RecurrenceFrequency, CustomPattern } from '@/lib/types';
 
 function toDate(d: string | Date): Date {
   if (d instanceof Date) {

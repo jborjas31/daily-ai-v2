@@ -9,25 +9,12 @@ import TaskModal from "@/components/library/TaskModal";
 import { createTemplate, listTemplates } from "@/lib/data/templates";
 import { toast } from "sonner";
 import { toastError, toastSuccess } from "@/lib/ui/toast";
-import { toMinutes, todayISO } from "@/lib/time";
+import { toMinutes, todayISO, addDaysISO } from "@/lib/time";
 import useNowTick from "@/lib/utils/useNowTick";
 import UpNextStrip from "@/components/today/UpNextStrip";
 import type { TaskTemplate } from "@/lib/types";
 
-function useNowMinutes() {
-  const [mins, setMins] = useState(() => {
-    const d = new Date();
-    return d.getHours() * 60 + d.getMinutes();
-  });
-  useEffect(() => {
-    const id = setInterval(() => {
-      const d = new Date();
-      setMins(d.getHours() * 60 + d.getMinutes());
-    }, 30_000);
-    return () => clearInterval(id);
-  }, []);
-  return mins;
-}
+// derive minutes from the shared now tick
 
 export default function TodayPage() {
   const { user, ready } = useRequireAuth();
@@ -43,17 +30,8 @@ export default function TodayPage() {
   const prefill = useAppStore((s: AppState) => s.ui.newTaskPrefill);
   const setNewTaskPrefill = useAppStore((s: AppState) => s.setNewTaskPrefill);
   const [modalOpen, setModalOpen] = useState(false);
-  const nowMins = useNowMinutes();
-  const { nowTime } = useNowTick(30_000);
-
-  function addDaysISO(dateISO: string, delta: number): string {
-    const d = new Date(dateISO + 'T00:00:00');
-    d.setDate(d.getDate() + delta);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  }
+  const { nowTime } = useNowTick(60_000);
+  const nowMins = useMemo(() => toMinutes(nowTime), [nowTime]);
 
   const isToday = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);

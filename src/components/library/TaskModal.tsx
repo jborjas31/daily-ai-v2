@@ -1,8 +1,7 @@
 "use client";
 import * as Dialog from "@radix-ui/react-dialog";
 import React, { useEffect, useState } from "react";
-import type { TaskTemplate, TimeWindow, TimeString } from "@/lib/types";
-import type { RecurrenceRule } from "@/lib/domain/scheduling/Recurrence";
+import type { TaskTemplate, TimeWindow, TimeString, RecurrenceRule } from "@/lib/types";
 import { validateRecurrenceRule } from "@/lib/domain/scheduling/Recurrence";
 import { useAppStore } from "@/store/useAppStore";
 import { validateForm } from "./taskModalValidation";

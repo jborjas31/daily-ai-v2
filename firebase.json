@@ -2,6 +2,7 @@
   "hosting": {
     "public": "out",
     "predeploy": [
+      "npm run typecheck",
       "npm run build"
     ],
     "ignore": [

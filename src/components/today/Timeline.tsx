@@ -25,7 +25,7 @@ export default function Timeline() {
   const scheduleRes = useAppStore((s) => s.generateScheduleForDate(currentDate));
   const instances = useAppStore((s) => s.getTaskInstancesForDate(s.ui.currentDate));
   const containerRef = useRef<HTMLDivElement>(null);
-  const { nowTime } = useNowTick(30_000);
+  const { nowTime } = useNowTick(60_000);
   const nowMins = useMemo(() => toMinutes(nowTime as TimeString), [nowTime]);
   const setNewTaskPrefill = useAppStore((s) => s.setNewTaskPrefill);
   const [rowHeight, setRowHeight] = useState<number>(BASE_ROW_HEIGHT);
