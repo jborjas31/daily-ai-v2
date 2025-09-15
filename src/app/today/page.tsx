@@ -33,10 +33,7 @@ export default function TodayPage() {
   const { nowTime } = useNowTick(60_000);
   const nowMins = useMemo(() => toMinutes(nowTime), [nowTime]);
 
-  const isToday = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return currentDate === today;
-  }, [currentDate]);
+  const isToday = useMemo(() => currentDate === todayISO(), [currentDate]);
 
   const { completedCount, skippedCount, overdueCount } = useMemo(() => {
     const completedCount = instances.filter(i => i.status === 'completed').length;
