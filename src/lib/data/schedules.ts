@@ -14,11 +14,14 @@ export async function getCachedSchedule(uid: string, date: string): Promise<Sche
 }
 
 export async function putCachedSchedule(uid: string, date: string, result: ScheduleResult): Promise<void> {
+  const { message, error, advisories, ...required } = result;
   const payload = {
-    ...result,
+    ...required,
+    ...(message !== undefined && { message }),
+    ...(error !== undefined && { error }),
+    ...(advisories !== undefined && { advisories }),
     updatedAt: serverTimestamp(),
     version: "v1",
   };
   await setDoc(ref(uid, date), payload, { merge: true });
 }
-

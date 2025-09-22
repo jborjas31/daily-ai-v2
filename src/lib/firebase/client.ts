@@ -13,10 +13,28 @@ import {
 } from "firebase/auth";
 import {
   getFirestore,
+  initializeFirestore,
+  memoryLocalCache,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   type Firestore,
-  enableIndexedDbPersistence,
-  enableMultiTabIndexedDbPersistence,
 } from "firebase/firestore";
+
+type FirestoreInitSettings = Parameters<typeof initializeFirestore>[1];
+
+function buildPersistentCacheSettings(): FirestoreInitSettings {
+  return {
+    cache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
+  } as unknown as FirestoreInitSettings;
+}
+
+function buildMemoryCacheSettings(): FirestoreInitSettings {
+  return {
+    cache: memoryLocalCache(),
+  } as unknown as FirestoreInitSettings;
+}
 
 let appInstance: FirebaseApp | null = null;
 let authInstance: Auth | null = null;
@@ -48,22 +66,46 @@ export function getFirebaseAuth(): Auth {
 
 export function getFirestoreDb(): Firestore {
   if (dbInstance) return dbInstance;
-  dbInstance = getFirestore(getFirebaseApp());
+  const app = getFirebaseApp();
+
+  if (typeof window === "undefined") {
+    dbInstance = getFirestore(app);
+    return dbInstance;
+  }
+
+  try {
+    dbInstance = initializeFirestore(app, buildPersistentCacheSettings());
+  } catch (err) {
+    const message = (err as Error | undefined)?.message ?? "";
+    if (message.includes("already exists")) {
+      dbInstance = getFirestore(app);
+      return dbInstance;
+    }
+
+    console.warn("Persistent Firestore cache unavailable, using in-memory cache instead.", err);
+    try {
+      dbInstance = initializeFirestore(app, buildMemoryCacheSettings());
+    } catch (fallbackErr) {
+      const fallbackMessage = (fallbackErr as Error | undefined)?.message ?? "";
+      if (!fallbackMessage.includes("already exists")) {
+        console.warn(
+          "Failed to initialize Firestore memory cache; falling back to default instance.",
+          fallbackErr,
+        );
+      }
+      dbInstance = getFirestore(app);
+    }
+  }
+
   return dbInstance;
 }
 
 export async function ensureFirestorePersistence(): Promise<void> {
   if (persistenceInitialized) return;
-  const db = getFirestoreDb();
   try {
-    // Try multi-tab first; fall back to single-tab if not available
-    await enableMultiTabIndexedDbPersistence(db);
-  } catch {
-    try {
-      await enableIndexedDbPersistence(db);
-    } catch (e) {
-      console.warn("Firestore persistence not available:", e);
-    }
+    getFirestoreDb();
+  } catch (e) {
+    console.warn("Firestore persistence configuration failed:", e);
   } finally {
     persistenceInitialized = true;
   }
