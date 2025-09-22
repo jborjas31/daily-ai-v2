@@ -1,6 +1,6 @@
 # Phase 7 — Offline Enhancements (Action Plan)
 
-Scope: Provide a resilient, user‑visible offline write experience beyond Firestore’s built‑in persistence. Add a lightweight client write queue with retry/backoff and conflict handling, plus a minimal sync status indicator. Prepare hooks for a background sync via a service worker (post‑MVP) without blocking release.
+Scope: Provide a resilient, user‑visible offline write experience beyond Firestore’s built‑in persistence. Add a client write queue with retry/backoff, minimal conflict handling, a header sync status indicator, and multi‑tab coordination. Queue all instance ops and template updates/deletes; template creates/duplicates remain direct writes (Firestore offline handles them cleanly). Prepare a service‑worker touchpoint but do not block on it.
 
 ## UX Principles (Phase 7)
 
@@ -11,7 +11,7 @@ Scope: Provide a resilient, user‑visible offline write experience beyond Fires
 
 ## 0) Preconditions
 
-Status: Planned
+Status: Planned (see decisions in `docs/phase-7-preflight.md`)
 
 - Store actions exist for user writes (already implemented):
   - Instances: `setInstanceStartTime`, `toggleComplete`, `skipInstance`, `postponeInstance`, `undoInstanceStatus`
@@ -29,7 +29,7 @@ Status: Planned
 - File: `src/lib/offline/writeQueue.ts`
 - Item shape:
   - `id: string` — ULID/UUID
-  - `kind: 'upsertInstance'|'deleteInstance'|'updateTemplate'|'createTemplate'|'softDeleteTemplate'|'setInstanceStartTime'|...`
+  - `kind: 'upsertInstance'|'deleteInstance'|'updateTemplate'|'softDeleteTemplate'|'setInstanceStartTime'|'skipInstance'|'postponeInstance'|'toggleComplete'|'undoInstanceStatus'`
   - `payload: Record<string, unknown>` — inputs for the operation
   - `key: string` — dedupe key, e.g., `inst:{uid}:{date}:{templateId}` or `tpl:{uid}:{templateId}`
   - `baseRev?: number` — optional local revision for conflict check (e.g., milliseconds from `updatedAt` when available)
@@ -56,21 +56,23 @@ Acceptance:
 Acceptance:
 - Unit tests: dedupe policy, persistence, and basic enqueue/dequeue behavior.
 
-## 2) Flusher & Backoff
+## 2) Flusher, Classification & Backoff
 
 Status: Planned
 
 2.1 Flusher loop
 - File: `src/lib/offline/flush.ts`
-- `startFlusher({ online$: Observable<boolean> })` that:
-  - Wakes on: app start, `online$` true, visibility change to visible, and when `now >= nextAt`.
-  - Processes N items (e.g., 10) per tick; exponential backoff (e.g., 2^attempts * 1000ms, capped at 60s).
-  - Uses the existing data layer (`src/lib/data/*`) to perform writes.
+- Start at app bootstrap; wake on: `online` event, visibility visible, a periodic tick (e.g., 10s), and when `Date.now() >= nextAt`.
+- Process small batches per tick (e.g., 10). Exponential backoff `min(60s, 1000ms * 2^attempts)`.
+- Use the existing data layer (`src/lib/data/*`) to perform writes.
 
-2.2 Result handling
-- Success: remove from queue; notify UI progress.
-- Retryable failure (network/unavailable): increment `attempts`, reschedule `nextAt`.
-- Conflict or permission failure: drop or park item with `state='failed'` and surface a toast with actions (3.3).
+2.2 Classification
+- Map Firestore errors to retryable vs hard per pre‑flight (§2). Treat `not-found` deletes as success.
+
+2.3 Result handling
+- Success: remove from queue; update pending count.
+- Retryable: increment `attempts`, reschedule `nextAt`.
+- Hard: mark `failed` and surface a coalesced toast with `Retry`/`Undo`.
 
 Acceptance:
 - Unit tests with mocked data layer: success, retry, backoff, and hard failure paths.
@@ -116,6 +118,11 @@ Status: Planned
 Acceptance:
 - Unit tests simulate a conflicting template update and verify toast and queue behavior.
 
+4.3 Auth Scoping & Multi‑Tab Coordination
+- Namespace the queue by `uid`; clear on sign‑out and re‑initialize on user change.
+- Single‑writer lease across tabs (see pre‑flight §6): advisory lock in IndexedDB with `holderId` and `expiresAt`, renewed ~10s (timeout 30s). Pause flushing when the tab is hidden.
+- Use a `BroadcastChannel` (e.g., `queue:{uid}`) for lease announcements and (dev) diagnostics.
+
 ## 5) Network/Visibility Signals
 
 Status: Planned
@@ -129,6 +136,10 @@ Status: Planned
 
 Acceptance:
 - Toggling offline/online in tests (mock) pauses/resumes flush and updates header badge.
+
+5.3 Retention & Limits
+- TTL: ~7 days; prune expired items on wake.
+- Cap: ~500 items; on overflow, drop oldest retryable items. Hard‑failed items are pruned after user acknowledgement.
 
 ## 6) Service Worker (Post‑MVP Hook)
 
@@ -178,7 +189,7 @@ Acceptance:
 
 Status: Planned
 
-- Feature flag: `NEXT_PUBLIC_OFFLINE_QUEUE=1` to enable in production.
+- Feature flag: `NEXT_PUBLIC_QUEUE_ENABLED=1` to enable in production.
 - Graceful degradation: if IDB unavailable, queue falls back to in‑memory with warning; UX still shows “Offline (N queued)” within session.
 - Error budgets: cap attempts at e.g. 8 with 60s max backoff; park item as failed after cap.
 
@@ -198,10 +209,28 @@ Acceptance:
 ## Acceptance Summary (Phase 7)
 
 - Offline write attempts never block UI, and changes survive reloads.
+ - Header chip reflects `pending`/`syncing` accurately and updates on online/flush.
+ - Hard failures show a single coalesced toast with working `Retry`/`Undo`.
+ - Multi‑tab runs with a single writer.
+
+## Milestones (Suggested)
+
+- M1: Queue types + IDB storage + dedupe tests; header chip shows `pending`.
+- M2: Flusher + classification/backoff; chip shows “Syncing…”.
+- M3: Wire instance ops through queue; verify offline→online flush.
+- M4: Add template update/delete; verify ordering/dedupe.
+- M5: Multi‑tab lease with tests (two tabs).
+- M6: Failure toast with Retry/Undo; minimal `prevState` stored; tests.
+- M7: Retention/limits + `lastSyncAt` polish.
+
+## Out of Scope (Phase 7)
+
+- Queuing template creates/duplicates (direct writes suffice with Firestore offline).
+- Timeline Task Details (popover/sheet) — defer to a later phase.
 
 ## 10) Timeline Task Details (Google Calendar-style)
 
-Status: Planned
+Status: Deferred (move to a later phase)
 
 10.1 Pattern and UX
 - Single-click a timeline block opens a contextual details popover anchored to the clicked block (desktop). On small screens, show a bottom sheet (Dialog) instead.
